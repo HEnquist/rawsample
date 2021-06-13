@@ -1,4 +1,5 @@
-
+extern crate num_traits;
+use num_traits::Float;
 
 pub trait Sample<T> {
     const MAX_I32: T;
@@ -14,16 +15,30 @@ pub trait Sample<T> {
 }
 
 
-fn clamp_int_f64(invalue: f64, max: f64) -> (f64, bool) {
+fn clamp_int_f64(invalue: f64, maxval: f64) -> (f64, bool) {
     let mut val = invalue;
     let mut clipped = false;
-    if val >= max {
+    if val >= maxval {
         clipped = true;
-        val = max - 1.0;
+        val = maxval - 1.0;
     }
-    else if val < -max {
+    else if val < -maxval {
         clipped = true;
-        val = -max
+        val = -maxval
+    }
+    (val, clipped)
+}
+
+fn clamp_int<T: Float>(invalue: T, maxval: T) -> (T, bool) {
+    let mut val = invalue;
+    let mut clipped = false;
+    if val >= maxval {
+        clipped = true;
+        val = maxval - T::from(1.0).unwrap();
+    }
+    else if val < -maxval {
+        clipped = true;
+        val = -maxval
     }
     (val, clipped)
 }
@@ -31,13 +46,13 @@ fn clamp_int_f64(invalue: f64, max: f64) -> (f64, bool) {
 fn clamp_float_f64(invalue: f64) -> (f64, bool) {
     let mut val = invalue;
     let mut clipped = false;
-    if val >= max {
+    if val >= 1.0 {
         clipped = true;
-        val = max - 1.0;
+        val = 1.0;
     }
-    else if val < -max {
+    else if val < -1.0 {
         clipped = true;
-        val = -max
+        val = -1.0
     }
     (val, clipped)
 }
