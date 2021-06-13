@@ -28,6 +28,20 @@ fn clamp_int_f64(invalue: f64, max: f64) -> (f64, bool) {
     (val, clipped)
 }
 
+fn clamp_float_f64(invalue: f64) -> (f64, bool) {
+    let mut val = invalue;
+    let mut clipped = false;
+    if val >= max {
+        clipped = true;
+        val = max - 1.0;
+    }
+    else if val < -max {
+        clipped = true;
+        val = -max
+    }
+    (val, clipped)
+}
+
 impl Sample<f64> for f64 {
     const MAX_I32: f64 = 2147483648.0;
     const MAX_I24: f64 = 8388608.0;
