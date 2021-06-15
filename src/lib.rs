@@ -1,5 +1,5 @@
 extern crate num_traits;
-use num_traits::Float;
+use num_traits::{Bounded, Float, ToPrimitive};
 
 pub trait Sample<T> {
     const MAX_I32: T;
@@ -22,32 +22,24 @@ pub trait Sample<T> {
 }
 
 
-fn clamp_int<T: Float>(invalue: T, maxval: T) -> (T, bool) {
-    let mut val = invalue;
-    let mut clipped = false;
-    if val >= maxval {
-        clipped = true;
-        val = maxval - T::one();
+fn clamp_int<T: Float, U: Bounded+ToPrimitive>(value: T) -> (T, bool) {
+    if value > T::from(U::max_value()).unwrap() {
+        return (T::from(U::max_value()).unwrap(), true);
     }
-    else if val < -maxval {
-        clipped = true;
-        val = -maxval
+    else if value < T::from(U::min_value()).unwrap() {
+        return (T::from(U::min_value()).unwrap(), true);
     }
-    (val, clipped)
+    (value, false)
 }
 
-fn clamp_float<T: Float>(invalue: T) -> (T, bool) {
-    let mut val = invalue;
-    let mut clipped = false;
-    if val >= T::one() {
-        clipped = true;
-        val = T::one();
+fn clamp_float<T: Float>(value: T) -> (T, bool) {
+    if value >= T::one() {
+        return (T::one(), true);
     }
-    else if val < -T::one() {
-        clipped = true;
-        val = -T::one()
+    else if value < -T::one() {
+        return (-T::one(), true);
     }
-    (val, clipped)
+    (value, false)
 }
 
 impl Sample<f64> for f64 {
@@ -55,29 +47,28 @@ impl Sample<f64> for f64 {
     const MAX_I24: f64 = 8388608.0;
     const MAX_I16: f64 = 32768.0;
 
-
     fn to_s16_le(&self) -> ([u8; 2], bool) {
         let val = self * f64::MAX_I16;
-        let (val, clipped) = clamp_int(val, f64::MAX_I16); 
+        let (val, clipped) = clamp_int::<f64, i16>(val); 
         ((val as i16).to_le_bytes(), clipped)
     } 
 
     fn to_s32_le(&self) -> ([u8; 4], bool) {
         let val = self * f64::MAX_I32;
-        let (val, clipped) = clamp_int(val, f64::MAX_I32); 
+        let (val, clipped) = clamp_int::<f64, i32>(val); 
         ((val as i32).to_le_bytes(), clipped)
     } 
 
     fn to_s24_3_le(&self) -> ([u8; 3], bool) {
         let val = self * f64::MAX_I32;
-        let (val, clipped) = clamp_int(val, f64::MAX_I32);
+        let (val, clipped) = clamp_int::<f64, i32>(val); 
         let bytes = (val as i32).to_le_bytes();
         ([bytes[1], bytes[2], bytes[3]], clipped)
     } 
 
     fn to_s24_4_le(&self) -> ([u8; 4], bool) {
         let val = self * f64::MAX_I32;
-        let (val, clipped) = clamp_int(val, f64::MAX_I32);
+        let (val, clipped) = clamp_int::<f64, i32>(val); 
         let bytes = (val as i32).to_le_bytes();
         ([bytes[1], bytes[2], bytes[3], 0], clipped)
     } 
@@ -96,28 +87,28 @@ impl Sample<f64> for f64 {
 
     fn from_s32_le(bytes: [u8; 4]) -> Self {
         let intvalue = i32::from_le_bytes(bytes);
-        intvalue as f64 / f64::MAX_I32
+        f64::from(intvalue) / f64::MAX_I32
     }
 
     fn from_s16_le(bytes: [u8; 2]) -> Self {
         let intvalue = i16::from_le_bytes(bytes);
-        intvalue as f64 / f64::MAX_I16
+        f64::from(intvalue) / f64::MAX_I16
     }
 
     fn from_s24_3_le(bytes: [u8; 3]) -> Self {
         let padded = [0, bytes[0], bytes[1], bytes[2]];
         let intvalue = i32::from_le_bytes(padded);
-        intvalue as f64 / f64::MAX_I32
+        f64::from(intvalue) / f64::MAX_I32
     }
 
     fn from_s24_4_le(bytes: [u8; 4]) -> Self {
         let padded = [0, bytes[0], bytes[1], bytes[2]];
         let intvalue = i32::from_le_bytes(padded);
-        intvalue as f64 / f64::MAX_I32
+        f64::from(intvalue) / f64::MAX_I32
     }
 
     fn from_f32_le(bytes: [u8; 4]) -> Self {
-        f32::from_le_bytes(bytes) as f64
+        f64::from(f32::from_le_bytes(bytes))
     }
 
     fn from_f64_le(bytes: [u8; 8]) -> Self {
@@ -134,32 +125,32 @@ impl Sample<f32> for f32 {
 
     fn to_s16_le(&self) -> ([u8; 2], bool) {
         let val = self * f32::MAX_I16;
-        let (val, clipped) = clamp_int(val, f32::MAX_I16); 
+        let (val, clipped) = clamp_int::<f32, i16>(val); 
         ((val as i16).to_le_bytes(), clipped)
     } 
 
     fn to_s32_le(&self) -> ([u8; 4], bool) {
         let val = self * f32::MAX_I32;
-        let (val, clipped) = clamp_int(val, f32::MAX_I32); 
+        let (val, clipped) = clamp_int::<f32, i32>(val); 
         ((val as i32).to_le_bytes(), clipped)
     } 
 
     fn to_s24_3_le(&self) -> ([u8; 3], bool) {
         let val = self * f32::MAX_I32;
-        let (val, clipped) = clamp_int(val, f32::MAX_I32);
+        let (val, clipped) = clamp_int::<f32, i32>(val); 
         let bytes = (val as i32).to_le_bytes();
         ([bytes[1], bytes[2], bytes[3]], clipped)
     } 
 
     fn to_s24_4_le(&self) -> ([u8; 4], bool) {
         let val = self * f32::MAX_I32;
-        let (val, clipped) = clamp_int(val, f32::MAX_I32);
+        let (val, clipped) = clamp_int::<f32, i32>(val); 
         let bytes = (val as i32).to_le_bytes();
         ([bytes[1], bytes[2], bytes[3], 0], clipped)
     } 
 
     fn to_f64_le(&self) -> ([u8; 8], bool) {
-        let val = *self as f64;
+        let val = f64::from(*self);
         let (val, clipped) = clamp_float(val);
         (val.to_le_bytes(), clipped)
     } 
@@ -176,7 +167,7 @@ impl Sample<f32> for f32 {
 
     fn from_s16_le(bytes: [u8; 2]) -> Self {
         let intvalue = i16::from_le_bytes(bytes);
-        intvalue as f32 / f32::MAX_I16
+        f32::from(intvalue) / f32::MAX_I16
     }
 
     fn from_s24_3_le(bytes: [u8; 3]) -> Self {
@@ -423,7 +414,7 @@ mod tests {
         assert_eq!(val.to_f64_le(), (exp, true));
     }
 
-    #[test]
+    //#[test]
     fn dummy() {
         let v1: f32 = 127.0;
         let v2: f32 = 128.0;
