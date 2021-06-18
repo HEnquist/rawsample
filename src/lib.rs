@@ -1,7 +1,8 @@
 extern crate num_traits;
 use num_traits::{Bounded, Float, ToPrimitive};
+use std::io::{Read, Write};
 
-pub trait Sample<T> {
+pub trait Sample<T: Sized> {
     const MAX_I32: T;
     const MAX_I24: T;
     const MAX_I16: T;
@@ -21,6 +22,66 @@ pub trait Sample<T> {
     fn from_f64_le(bytes: [u8; 8]) -> Self;
 }
 
+pub enum SampleFormat {
+    S16LE,
+    S24LE3,
+    S24LE4,
+    S32LE,
+    F32LE,
+    F64LE,
+}
+
+pub trait SampleWriter<T: Sample<T>> {
+    fn write_multi(values: &[T], target: &mut dyn Write, sformat: &SampleFormat) -> usize {
+        let mut nbr_clipped = 0;
+        match sformat {
+            SampleFormat::S16LE => {
+                for value in values.iter() {
+                    let (bytes, clipped) = value.to_s16_le();
+                    if clipped {
+                        nbr_clipped += 1;
+                    }
+                    target.write_all(&bytes).unwrap();
+                }
+            }
+            _ => panic!("soon.."),
+        }
+        nbr_clipped
+    }
+}
+
+impl SampleWriter<f64> for f64 {}
+impl SampleWriter<f32> for f32 {}
+
+
+pub trait SampleReader<T: Sample<T>> {
+    fn read_multi(data: &mut dyn Read, values: &mut [T],  sformat: &SampleFormat) -> usize {
+        let mut nbr_read = 0;
+        match sformat {
+            SampleFormat::S16LE => {
+                let mut bytes = [0, 0];
+                for value in values.iter_mut() {
+                    if let Ok(nbr) = data.read(&mut bytes) {
+                        if nbr < 2 {
+                            break
+                        }
+                        let newvalue = T::from_s16_le(bytes);
+                        *value = newvalue;
+                        nbr_read += 1;
+                    }
+                    else {
+                        break
+                    }
+                }
+            }
+            _ => panic!("soon.."),
+        }
+        nbr_read
+    }
+}
+
+impl SampleReader<f64> for f64 {}
+impl SampleReader<f32> for f32 {}
 
 fn clamp_int<T: Float, U: Bounded+ToPrimitive>(value: T) -> (T, bool) {
     if value > T::from(U::max_value()).unwrap() {
@@ -194,6 +255,9 @@ impl Sample<f32> for f32 {
 #[cfg(test)]
 mod tests {
     use crate::Sample;
+    use crate::SampleFormat;
+    use crate::SampleWriter;
+    use crate::SampleReader;
 
     // -----------------
     //       f64 
@@ -412,6 +476,18 @@ mod tests {
         let val: f32 = -1.1;
         let exp = (-1.0 as f64).to_le_bytes();
         assert_eq!(val.to_f64_le(), (exp, true));
+    }
+
+
+    #[test]
+    fn write_read_s16le() {
+        let values = vec![-0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5];
+        let mut data: Vec<u8> = Vec::new();
+        f64::write_multi(&values, &mut data, &SampleFormat::S16LE);
+        let mut values2 = vec![0.0; 7];
+        let mut slice: &[u8] = &data;
+        f64::read_multi(&mut slice, &mut values2, &SampleFormat::S16LE);
+        assert_eq!(values, values2);
     }
 
     //#[test]
