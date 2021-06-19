@@ -2,6 +2,13 @@
 name = "rawsample"
 version = "0.1.0"
 edition = "2018"
+authors = ["HEnquist <henrik.enquist@gmail.com>"]
+description = "A library for working with raw audio samples."
+license = "MIT"
+repository = "https://github.com/HEnquist/rawsamples"
+keywords = ["audio", "sound"]
+categories = ["multimedia::audio"]
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
