@@ -1,12 +1,12 @@
 //! # RawSample
-//! 
+//!
 //! A library for working with raw audio samples.
-//! 
-//! Most audio APIs work with buffers of bytes. 
+//!
+//! Most audio APIs work with buffers of bytes.
 //! To do anything with the sample values, these raw bytes must be converted to and from numeric types.
-//! 
+//!
 //! This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values. Both f32 and f64 are supported.
-//! 
+//!
 //! ```rust
 //! use rawsample::{SampleWriter, SampleReader, SampleFormat};
 //! // create a vec of samples
@@ -15,11 +15,11 @@
 //! let mut rawbytes: Vec<u8> = Vec::new();
 //! // write the samples as raw bytes
 //! f64::write_samples(&values, &mut rawbytes, &SampleFormat::S32LE).unwrap();
-//! // create another vec to store the samples after reading back 
+//! // create another vec to store the samples after reading back
 //! let mut values2 = Vec::new();
 //! let mut slice: &[u8] = &rawbytes;
-//! 
-//! // read the raw bytes back as samples into the new vec 
+//!
+//! // read the raw bytes back as samples into the new vec
 //! f64::read_all_samples(&mut slice, &mut values2, &SampleFormat::S32LE).unwrap();
 //! ```
 
@@ -30,19 +30,19 @@ use std::io::ErrorKind;
 use std::io::{Read, Write};
 
 /// The Sample trait is used for low-level conversions of samples stored as raw bytes, to f32 or f64 sample values.
-/// 
+///
 /// The float values are expected to use the range -1.0 <= value < +1.0.
-/// The integer types are mapped to this range. 
+/// The integer types are mapped to this range.
 /// Using f32, up to 24 byte integers can be converted without loss to and from float.
 /// 32-bit integers required the use of f64 for lossless conversion.
 ///
-/// The exact range depends on the format. The lower limit is always -1.0. But the upper limit is (2^(n-1)-1)/2^(n-1). 
+/// The exact range depends on the format. The lower limit is always -1.0. But the upper limit is (2^(n-1)-1)/2^(n-1).
 /// For example for 16-bit integer, the maximum value is (2^15-1)/2^15, approximately +0.99997.
 ///
-/// When reading from raw bytes, there is no clipping. Integer types cannot go outside the range. 
+/// When reading from raw bytes, there is no clipping. Integer types cannot go outside the range.
 /// Float values are read as they are, and are thus allowed to be outside the -1.0 to +1.0 range.
 ///
-/// When writing samples, the float sample values are clamped to the range supported by the chosen format. 
+/// When writing samples, the float sample values are clamped to the range supported by the chosen format.
 /// Float output values are also clamped to the -1.0 to +1.0 range, since this is what most audio APIs expect.
 
 pub trait Sample<T: Sized> {
@@ -52,15 +52,15 @@ pub trait Sample<T: Sized> {
 
     /// Convert a sample value to S32LE (4 bytes)
     fn to_s32_le(&self) -> ([u8; 4], bool);
-    /// Convert a sample value to S24LE3 (3 bytes) 
+    /// Convert a sample value to S24LE3 (3 bytes)
     fn to_s24_3_le(&self) -> ([u8; 3], bool);
-    /// Convert a sample value to S24LE4 (4 bytes) 
+    /// Convert a sample value to S24LE4 (4 bytes)
     fn to_s24_4_le(&self) -> ([u8; 4], bool);
-    /// Convert a sample value to S16LE (2 bytes) 
+    /// Convert a sample value to S16LE (2 bytes)
     fn to_s16_le(&self) -> ([u8; 2], bool);
-    /// Convert a sample value to F32LE (4 bytes) 
+    /// Convert a sample value to F32LE (4 bytes)
     fn to_f64_le(&self) -> ([u8; 8], bool);
-    /// Convert a sample value to F64LE (8 bytes) 
+    /// Convert a sample value to F64LE (8 bytes)
     fn to_f32_le(&self) -> ([u8; 4], bool);
 
     /// Convert S32LE (4 bytes) to a sample value
@@ -93,31 +93,28 @@ pub enum SampleFormat {
     F64LE,
 }
 
-
 macro_rules! write_samples {
-    ($values:expr, $target:expr, $conv:ident) => {
-        {
-            let mut nbr_clipped = 0;
-            for value in $values.iter() {
-                let (bytes, clipped) = value.$conv();
-                if clipped {
-                    nbr_clipped += 1;
-                }
-                $target.write_all(&bytes)?;
+    ($values:expr, $target:expr, $conv:ident) => {{
+        let mut nbr_clipped = 0;
+        for value in $values.iter() {
+            let (bytes, clipped) = value.$conv();
+            if clipped {
+                nbr_clipped += 1;
             }
-            nbr_clipped
+            $target.write_all(&bytes)?;
         }
-    };
+        nbr_clipped
+    }};
 }
 
-/// The SampleWriter trait enables converting and writing many sample values from a slice. 
+/// The SampleWriter trait enables converting and writing many sample values from a slice.
 pub trait SampleWriter<T: Sample<T>> {
-    /// Write sample values from a slice to anything that implements the "Write" trait. 
-    /// This can be for example a file, or a Vec of u8. 
+    /// Write sample values from a slice to anything that implements the "Write" trait.
+    /// This can be for example a file, or a Vec of u8.
     /// Input samples are f32 or f64, and are converted to the given sample format.
     /// The sample values are clamped to the range supported by the output format.
     /// For the float types, the input range is -1.0 to +1.0.
-    /// For the integer types, the input range doesn't include 1.0. 
+    /// For the integer types, the input range doesn't include 1.0.
     /// For example for I16 the maximum value is (2^15-1)/2^15, approximately +0.99997.
     /// The number of clipped samples is returned.
     fn write_samples(
@@ -153,58 +150,52 @@ pub trait SampleWriter<T: Sample<T>> {
 impl SampleWriter<f64> for f64 {}
 impl SampleWriter<f32> for f32 {}
 
-
 macro_rules! read_samples_to_slice {
-    ($data:expr, $values:expr, $conv:ident, $n:expr) => {
-        {
-            let mut nbr_read = 0;
-            for value in $values.iter_mut() {
-                let mut bytes = [0; $n];
-                match $data.read_exact(&mut bytes) {
-                    Ok(()) => {}
-                    Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
-                        break;
-                    }
-                    Err(err) => return Err(Box::new(err)),
+    ($data:expr, $values:expr, $conv:ident, $n:expr) => {{
+        let mut nbr_read = 0;
+        for value in $values.iter_mut() {
+            let mut bytes = [0; $n];
+            match $data.read_exact(&mut bytes) {
+                Ok(()) => {}
+                Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
+                    break;
                 }
-                let newvalue = T::$conv(bytes);
-                *value = newvalue;
-                nbr_read += 1;
+                Err(err) => return Err(Box::new(err)),
             }
-            nbr_read
+            let newvalue = T::$conv(bytes);
+            *value = newvalue;
+            nbr_read += 1;
         }
-    };
+        nbr_read
+    }};
 }
 
 macro_rules! read_all_samples_to_vec {
-    ($data:expr, $values:expr, $conv:ident, $n:expr) => {
-        {
-            let mut bytes = [0; $n];
-            loop {
-                match $data.read_exact(&mut bytes) {
-                    Ok(()) => {}
-                    Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
-                        break;
-                    },
-                    Err(err) => return Err(Box::new(err)),
+    ($data:expr, $values:expr, $conv:ident, $n:expr) => {{
+        let mut bytes = [0; $n];
+        loop {
+            match $data.read_exact(&mut bytes) {
+                Ok(()) => {}
+                Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
+                    break;
                 }
-                let newvalue = T::$conv(bytes);
-                $values.push(newvalue);
+                Err(err) => return Err(Box::new(err)),
             }
+            let newvalue = T::$conv(bytes);
+            $values.push(newvalue);
         }
-    };
+    }};
 }
 
-
-/// The SampleReader trait enables reading and converting raw bytes and to multiple samples. 
+/// The SampleReader trait enables reading and converting raw bytes and to multiple samples.
 
 pub trait SampleReader<T: Sample<T>> {
-    /// Read bytes from anything that implements the "Read" trait. 
-    /// This can be for example a file, or a slice of u8. 
+    /// Read bytes from anything that implements the "Read" trait.
+    /// This can be for example a file, or a slice of u8.
     /// The bytes are then converted to f32 or f64 values, and stored in a slice.
     /// It will read until the samples slice is filled.
     /// If end-of-file of the source is reached before the slice is filled, the remaining values of the slice are left untouched.
-    /// The number of samples read is returned. 
+    /// The number of samples read is returned.
     fn read_samples(
         rawbytes: &mut dyn Read,
         samples: &mut [T],
@@ -234,11 +225,11 @@ pub trait SampleReader<T: Sample<T>> {
         Ok(nbr_read)
     }
 
-    /// Read all bytes from anything that implements the "Read" trait. 
-    /// This can be for example a file, or a slice of u8. 
+    /// Read all bytes from anything that implements the "Read" trait.
+    /// This can be for example a file, or a slice of u8.
     /// The bytes are then converted to f32 or f64 values, and appended to a vec.
     /// It will continue reading until reaching end-of-file of the source.
-    /// The number of samples read is returned. 
+    /// The number of samples read is returned.
     fn read_all_samples(
         rawbytes: &mut dyn Read,
         samples: &mut Vec<T>,
@@ -271,7 +262,6 @@ pub trait SampleReader<T: Sample<T>> {
 
 impl SampleReader<f64> for f64 {}
 impl SampleReader<f32> for f32 {}
-
 
 /// Clamp a float value to the range supported by an integer type
 fn clamp_int<T: Float, U: Bounded + ToPrimitive>(value: T) -> (T, bool) {
@@ -718,5 +708,4 @@ mod tests {
         let expected = vec![-0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 0.75, 0.75];
         assert_eq!(expected, values2);
     }
-
 }
