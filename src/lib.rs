@@ -5,7 +5,8 @@
 //! Most audio APIs work with buffers of bytes.
 //! To do anything with the sample values, these raw bytes must be converted to and from numeric types.
 //!
-//! This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values. Both f32 and f64 are supported.
+//! This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values. 
+//! Both f32 and f64 are supported, as well as both big-endian and little-endian byte order.
 //!
 //! ```rust
 //! use rawsample::{SampleWriter, SampleReader, SampleFormat};
@@ -56,14 +57,24 @@ pub trait Sample<T: Sized> {
     fn to_s32_be(&self) -> ([u8; 4], bool);
     /// Convert a sample value to S24LE3 (3 bytes)
     fn to_s24_3_le(&self) -> ([u8; 3], bool);
+    /// Convert a sample value to S24BE3 (3 bytes)
+    fn to_s24_3_be(&self) -> ([u8; 3], bool);
     /// Convert a sample value to S24LE4 (4 bytes)
     fn to_s24_4_le(&self) -> ([u8; 4], bool);
+    /// Convert a sample value to S24BE4 (4 bytes)
+    fn to_s24_4_be(&self) -> ([u8; 4], bool);
     /// Convert a sample value to S16LE (2 bytes)
     fn to_s16_le(&self) -> ([u8; 2], bool);
-    /// Convert a sample value to F32LE (4 bytes)
-    fn to_f64_le(&self) -> ([u8; 8], bool);
+    /// Convert a sample value to S16BE (2 bytes)
+    fn to_s16_be(&self) -> ([u8; 2], bool);
     /// Convert a sample value to F64LE (8 bytes)
+    fn to_f64_le(&self) -> ([u8; 8], bool);
+    /// Convert a sample value to F64BE (8 bytes)
+    fn to_f64_be(&self) -> ([u8; 8], bool);
+    /// Convert a sample value to F32LE (4 bytes)
     fn to_f32_le(&self) -> ([u8; 4], bool);
+    /// Convert a sample value to F32BE (4 bytes)
+    fn to_f32_be(&self) -> ([u8; 4], bool);
 
     /// Convert S32LE (4 bytes) to a sample value
     fn from_s32_le(bytes: [u8; 4]) -> Self;
@@ -71,32 +82,52 @@ pub trait Sample<T: Sized> {
     fn from_s32_be(bytes: [u8; 4]) -> Self;
     /// Convert S16LE (2 bytes) to a sample value
     fn from_s16_le(bytes: [u8; 2]) -> Self;
+    /// Convert S16BE (2 bytes) to a sample value
+    fn from_s16_be(bytes: [u8; 2]) -> Self;
     /// Convert S24LE3 (3 bytes) to a sample value
     fn from_s24_3_le(bytes: [u8; 3]) -> Self;
+    /// Convert S24BE3 (3 bytes) to a sample value
+    fn from_s24_3_be(bytes: [u8; 3]) -> Self;
     /// Convert S24LE4 (4 bytes) to a sample value
     fn from_s24_4_le(bytes: [u8; 4]) -> Self;
+    /// Convert S24BE4 (4 bytes) to a sample value
+    fn from_s24_4_be(bytes: [u8; 4]) -> Self;
     /// Convert F32LE (4 bytes) to a sample value
     fn from_f32_le(bytes: [u8; 4]) -> Self;
+    /// Convert F32BE (4 bytes) to a sample value
+    fn from_f32_be(bytes: [u8; 4]) -> Self;
     /// Convert F64LE (8 bytes) to a sample value
     fn from_f64_le(bytes: [u8; 8]) -> Self;
+    /// Convert F64BE (8 bytes) to a sample value
+    fn from_f64_be(bytes: [u8; 8]) -> Self;
 }
 
 /// The supported sample formats.
 pub enum SampleFormat {
     /// 16 bit signed integer, little endian.
     S16LE,
+    /// 16 bit signed integer, big endian.
+    S16BE,
     /// 24 bit signed integer, little endian, 24 bytes stored as 3 bytes.
     S24LE3,
+    /// 24 bit signed integer, big endian, 24 bytes stored as 3 bytes.
+    S24BE3,
     /// 24 bit signed integer, little endian, stored as 4 bytes. The data is in the lower 3 bytes and the most significant byte is padding.
     S24LE4,
+    /// 24 bit signed integer, big endian, stored as 4 bytes. The data is in the lower 3 bytes and the most significant byte is padding.
+    S24BE4,
     /// 32 bit signed integer, little endian.
     S32LE,
     /// 32 bit signed integer, big endian.
     S32BE,
     /// 32 bit floating point, little endian.
     F32LE,
+    /// 32 bit floating point, big endian.
+    F32BE,
     /// 64 bit floating point, little endian.
     F64LE,
+    /// 64 bit floating point, big endian.
+    F64BE,
 }
 
 macro_rules! write_samples {
@@ -133,11 +164,20 @@ pub trait SampleWriter<T: Sample<T>> {
             SampleFormat::S16LE => {
                 nbr_clipped = write_samples!(values, target, to_s16_le);
             }
+            SampleFormat::S16BE => {
+                nbr_clipped = write_samples!(values, target, to_s16_be);
+            }
             SampleFormat::S24LE3 => {
                 nbr_clipped = write_samples!(values, target, to_s24_3_le);
             }
+            SampleFormat::S24BE3 => {
+                nbr_clipped = write_samples!(values, target, to_s24_3_be);
+            }
             SampleFormat::S24LE4 => {
                 nbr_clipped = write_samples!(values, target, to_s24_4_le);
+            }
+            SampleFormat::S24BE4 => {
+                nbr_clipped = write_samples!(values, target, to_s24_4_be);
             }
             SampleFormat::S32LE => {
                 nbr_clipped = write_samples!(values, target, to_s32_le);
@@ -148,8 +188,14 @@ pub trait SampleWriter<T: Sample<T>> {
             SampleFormat::F32LE => {
                 nbr_clipped = write_samples!(values, target, to_f32_le);
             }
+            SampleFormat::F32BE => {
+                nbr_clipped = write_samples!(values, target, to_f32_be);
+            }
             SampleFormat::F64LE => {
                 nbr_clipped = write_samples!(values, target, to_f64_le);
+            }
+            SampleFormat::F64BE => {
+                nbr_clipped = write_samples!(values, target, to_f64_be);
             }
         }
         Ok(nbr_clipped)
@@ -215,11 +261,20 @@ pub trait SampleReader<T: Sample<T>> {
             SampleFormat::S16LE => {
                 nbr_read = read_samples_to_slice!(rawbytes, samples, from_s16_le, 2);
             }
+            SampleFormat::S16BE => {
+                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s16_be, 2);
+            }
             SampleFormat::S24LE3 => {
                 nbr_read = read_samples_to_slice!(rawbytes, samples, from_s24_3_le, 3);
             }
+            SampleFormat::S24BE3 => {
+                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s24_3_be, 3);
+            }
             SampleFormat::S24LE4 => {
                 nbr_read = read_samples_to_slice!(rawbytes, samples, from_s24_4_le, 4);
+            }
+            SampleFormat::S24BE4 => {
+                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s24_4_be, 4);
             }
             SampleFormat::S32LE => {
                 nbr_read = read_samples_to_slice!(rawbytes, samples, from_s32_le, 4);
@@ -230,8 +285,14 @@ pub trait SampleReader<T: Sample<T>> {
             SampleFormat::F32LE => {
                 nbr_read = read_samples_to_slice!(rawbytes, samples, from_f32_le, 4);
             }
+            SampleFormat::F32BE => {
+                nbr_read = read_samples_to_slice!(rawbytes, samples, from_f32_be, 4);
+            }
             SampleFormat::F64LE => {
                 nbr_read = read_samples_to_slice!(rawbytes, samples, from_f64_le, 8);
+            }
+            SampleFormat::F64BE => {
+                nbr_read = read_samples_to_slice!(rawbytes, samples, from_f64_be, 8);
             }
         }
         Ok(nbr_read)
@@ -252,11 +313,20 @@ pub trait SampleReader<T: Sample<T>> {
             SampleFormat::S16LE => {
                 read_all_samples_to_vec!(rawbytes, samples, from_s16_le, 2);
             }
+            SampleFormat::S16BE => {
+                read_all_samples_to_vec!(rawbytes, samples, from_s16_be, 2);
+            }
             SampleFormat::S24LE3 => {
                 read_all_samples_to_vec!(rawbytes, samples, from_s24_3_le, 3);
             }
+            SampleFormat::S24BE3 => {
+                read_all_samples_to_vec!(rawbytes, samples, from_s24_3_be, 3);
+            }
             SampleFormat::S24LE4 => {
                 read_all_samples_to_vec!(rawbytes, samples, from_s24_4_le, 4);
+            }
+            SampleFormat::S24BE4 => {
+                read_all_samples_to_vec!(rawbytes, samples, from_s24_4_be, 4);
             }
             SampleFormat::S32LE => {
                 read_all_samples_to_vec!(rawbytes, samples, from_s32_le, 4);
@@ -267,8 +337,14 @@ pub trait SampleReader<T: Sample<T>> {
             SampleFormat::F32LE => {
                 read_all_samples_to_vec!(rawbytes, samples, from_f32_le, 4);
             }
+            SampleFormat::F32BE => {
+                read_all_samples_to_vec!(rawbytes, samples, from_f32_be, 4);
+            }
             SampleFormat::F64LE => {
                 read_all_samples_to_vec!(rawbytes, samples, from_f64_le, 8);
+            }
+            SampleFormat::F64BE => {
+                read_all_samples_to_vec!(rawbytes, samples, from_f64_be, 8);
             }
         }
         Ok(samples.len() - start_len)
@@ -309,6 +385,12 @@ impl Sample<f64> for f64 {
         ((val as i16).to_le_bytes(), clipped)
     }
 
+    fn to_s16_be(&self) -> ([u8; 2], bool) {
+        let val = self * f64::MAX_I16;
+        let (val, clipped) = clamp_int::<f64, i16>(val);
+        ((val as i16).to_be_bytes(), clipped)
+    }
+
     fn to_s32_le(&self) -> ([u8; 4], bool) {
         let val = self * f64::MAX_I32;
         let (val, clipped) = clamp_int::<f64, i32>(val);
@@ -328,11 +410,25 @@ impl Sample<f64> for f64 {
         ([bytes[1], bytes[2], bytes[3]], clipped)
     }
 
+    fn to_s24_3_be(&self) -> ([u8; 3], bool) {
+        let val = self * f64::MAX_I32;
+        let (val, clipped) = clamp_int::<f64, i32>(val);
+        let bytes = (val as i32).to_be_bytes();
+        ([bytes[0], bytes[1], bytes[2]], clipped)
+    }
+
     fn to_s24_4_le(&self) -> ([u8; 4], bool) {
         let val = self * f64::MAX_I32;
         let (val, clipped) = clamp_int::<f64, i32>(val);
         let bytes = (val as i32).to_le_bytes();
         ([bytes[1], bytes[2], bytes[3], 0], clipped)
+    }
+
+    fn to_s24_4_be(&self) -> ([u8; 4], bool) {
+        let val = self * f64::MAX_I32;
+        let (val, clipped) = clamp_int::<f64, i32>(val);
+        let bytes = (val as i32).to_be_bytes();
+        ([0, bytes[0], bytes[1], bytes[2]], clipped)
     }
 
     fn to_f64_le(&self) -> ([u8; 8], bool) {
@@ -341,10 +437,22 @@ impl Sample<f64> for f64 {
         (val.to_le_bytes(), clipped)
     }
 
+    fn to_f64_be(&self) -> ([u8; 8], bool) {
+        let val = *self;
+        let (val, clipped) = clamp_float(val);
+        (val.to_be_bytes(), clipped)
+    }
+
     fn to_f32_le(&self) -> ([u8; 4], bool) {
         let val = *self as f32;
         let (val, clipped) = clamp_float(val);
         (val.to_le_bytes(), clipped)
+    }
+
+    fn to_f32_be(&self) -> ([u8; 4], bool) {
+        let val = *self as f32;
+        let (val, clipped) = clamp_float(val);
+        (val.to_be_bytes(), clipped)
     }
 
     fn from_s32_le(bytes: [u8; 4]) -> Self {
@@ -362,9 +470,20 @@ impl Sample<f64> for f64 {
         f64::from(intvalue) / f64::MAX_I16
     }
 
+    fn from_s16_be(bytes: [u8; 2]) -> Self {
+        let intvalue = i16::from_be_bytes(bytes);
+        f64::from(intvalue) / f64::MAX_I16
+    }
+
     fn from_s24_3_le(bytes: [u8; 3]) -> Self {
         let padded = [0, bytes[0], bytes[1], bytes[2]];
         let intvalue = i32::from_le_bytes(padded);
+        f64::from(intvalue) / f64::MAX_I32
+    }
+
+    fn from_s24_3_be(bytes: [u8; 3]) -> Self {
+        let padded = [bytes[0], bytes[1], bytes[2], 0];
+        let intvalue = i32::from_be_bytes(padded);
         f64::from(intvalue) / f64::MAX_I32
     }
 
@@ -374,12 +493,26 @@ impl Sample<f64> for f64 {
         f64::from(intvalue) / f64::MAX_I32
     }
 
+    fn from_s24_4_be(bytes: [u8; 4]) -> Self {
+        let padded = [bytes[1], bytes[2], bytes[3], 0];
+        let intvalue = i32::from_be_bytes(padded);
+        f64::from(intvalue) / f64::MAX_I32
+    }
+
     fn from_f32_le(bytes: [u8; 4]) -> Self {
         f64::from(f32::from_le_bytes(bytes))
     }
 
+    fn from_f32_be(bytes: [u8; 4]) -> Self {
+        f64::from(f32::from_be_bytes(bytes))
+    }
+
     fn from_f64_le(bytes: [u8; 8]) -> Self {
         f64::from_le_bytes(bytes)
+    }
+
+    fn from_f64_be(bytes: [u8; 8]) -> Self {
+        f64::from_be_bytes(bytes)
     }
 }
 
@@ -392,6 +525,12 @@ impl Sample<f32> for f32 {
         let val = self * f32::MAX_I16;
         let (val, clipped) = clamp_int::<f32, i16>(val);
         ((val as i16).to_le_bytes(), clipped)
+    }
+
+    fn to_s16_be(&self) -> ([u8; 2], bool) {
+        let val = self * f32::MAX_I16;
+        let (val, clipped) = clamp_int::<f32, i16>(val);
+        ((val as i16).to_be_bytes(), clipped)
     }
 
     fn to_s32_le(&self) -> ([u8; 4], bool) {
@@ -413,11 +552,25 @@ impl Sample<f32> for f32 {
         ([bytes[1], bytes[2], bytes[3]], clipped)
     }
 
+    fn to_s24_3_be(&self) -> ([u8; 3], bool) {
+        let val = self * f32::MAX_I32;
+        let (val, clipped) = clamp_int::<f32, i32>(val);
+        let bytes = (val as i32).to_be_bytes();
+        ([bytes[0], bytes[1], bytes[2]], clipped)
+    }
+
     fn to_s24_4_le(&self) -> ([u8; 4], bool) {
         let val = self * f32::MAX_I32;
         let (val, clipped) = clamp_int::<f32, i32>(val);
         let bytes = (val as i32).to_le_bytes();
         ([bytes[1], bytes[2], bytes[3], 0], clipped)
+    }
+
+    fn to_s24_4_be(&self) -> ([u8; 4], bool) {
+        let val = self * f32::MAX_I32;
+        let (val, clipped) = clamp_int::<f32, i32>(val);
+        let bytes = (val as i32).to_be_bytes();
+        ([0, bytes[0], bytes[1], bytes[2]], clipped)
     }
 
     fn to_f64_le(&self) -> ([u8; 8], bool) {
@@ -426,9 +579,20 @@ impl Sample<f32> for f32 {
         (val.to_le_bytes(), clipped)
     }
 
+    fn to_f64_be(&self) -> ([u8; 8], bool) {
+        let val = f64::from(*self);
+        let (val, clipped) = clamp_float(val);
+        (val.to_be_bytes(), clipped)
+    }
+
     fn to_f32_le(&self) -> ([u8; 4], bool) {
         let (val, clipped) = clamp_float(*self);
         (val.to_le_bytes(), clipped)
+    }
+
+    fn to_f32_be(&self) -> ([u8; 4], bool) {
+        let (val, clipped) = clamp_float(*self);
+        (val.to_be_bytes(), clipped)
     }
 
     fn from_s32_le(bytes: [u8; 4]) -> Self {
@@ -446,9 +610,20 @@ impl Sample<f32> for f32 {
         f32::from(intvalue) / f32::MAX_I16
     }
 
+    fn from_s16_be(bytes: [u8; 2]) -> Self {
+        let intvalue = i16::from_be_bytes(bytes);
+        f32::from(intvalue) / f32::MAX_I16
+    }
+
     fn from_s24_3_le(bytes: [u8; 3]) -> Self {
         let padded = [0, bytes[0], bytes[1], bytes[2]];
         let intvalue = i32::from_le_bytes(padded);
+        intvalue as f32 / f32::MAX_I32
+    }
+
+    fn from_s24_3_be(bytes: [u8; 3]) -> Self {
+        let padded = [bytes[0], bytes[1], bytes[2], 0];
+        let intvalue = i32::from_be_bytes(padded);
         intvalue as f32 / f32::MAX_I32
     }
 
@@ -458,12 +633,26 @@ impl Sample<f32> for f32 {
         intvalue as f32 / f32::MAX_I32
     }
 
+    fn from_s24_4_be(bytes: [u8; 4]) -> Self {
+        let padded = [bytes[1], bytes[2], bytes[3], 0];
+        let intvalue = i32::from_be_bytes(padded);
+        intvalue as f32 / f32::MAX_I32
+    }
+
     fn from_f32_le(bytes: [u8; 4]) -> Self {
         f32::from_le_bytes(bytes)
     }
 
+    fn from_f32_be(bytes: [u8; 4]) -> Self {
+        f32::from_be_bytes(bytes)
+    }
+
     fn from_f64_le(bytes: [u8; 8]) -> Self {
         f64::from_le_bytes(bytes) as f32
+    }
+
+    fn from_f64_be(bytes: [u8; 8]) -> Self {
+        f64::from_be_bytes(bytes) as f32
     }
 }
 
@@ -536,6 +725,18 @@ mod tests {
     }
 
     #[test]
+    fn check_f64_to_s243be() {
+        let val: f64 = 0.256789;
+        assert_eq!(val.to_s24_3_be(), ([32, 222, 118], false));
+        let val: f64 = -0.256789;
+        assert_eq!(val.to_s24_3_be(), ([223, 33, 137], false));
+        let val: f64 = 1.1;
+        assert_eq!(val.to_s24_3_be(), ([127, 255, 255], true));
+        let val: f64 = -1.1;
+        assert_eq!(val.to_s24_3_be(), ([128, 0, 0], true));
+    }
+
+    #[test]
     fn check_f64_from_s243le() {
         let data = [0, 64, 32];
         assert_eq!(f64::from_s24_3_le(data), 0.251953125);
@@ -546,6 +747,16 @@ mod tests {
     }
 
     #[test]
+    fn check_f64_from_s243be() {
+        let data = [32, 64, 0];
+        assert_eq!(f64::from_s24_3_be(data), 0.251953125);
+        let data = [223, 64, 0];
+        assert_eq!(f64::from_s24_3_be(data), -0.255859375);
+        let data = [128, 0, 0];
+        assert_eq!(f64::from_s24_3_be(data), -1.0);
+    }
+
+    #[test]
     fn check_f64_from_s244le() {
         let data = [0, 64, 32, 0];
         assert_eq!(f64::from_s24_4_le(data), 0.251953125);
@@ -553,6 +764,16 @@ mod tests {
         assert_eq!(f64::from_s24_4_le(data), -0.255859375);
         let data = [0, 0, 128, 0];
         assert_eq!(f64::from_s24_4_le(data), -1.0);
+    }
+
+    #[test]
+    fn check_f64_from_s244be() {
+        let data = [0, 32, 64, 0];
+        assert_eq!(f64::from_s24_4_be(data), 0.251953125);
+        let data = [0, 223, 64, 0];
+        assert_eq!(f64::from_s24_4_be(data), -0.255859375);
+        let data = [0, 128, 0, 0];
+        assert_eq!(f64::from_s24_4_be(data), -1.0);
     }
 
     #[test]
@@ -568,11 +789,31 @@ mod tests {
     }
 
     #[test]
+    fn check_f64_to_s244be() {
+        let val: f64 = 0.256789;
+        assert_eq!(val.to_s24_4_be(), ([0, 32, 222, 118], false));
+        let val: f64 = -0.256789;
+        assert_eq!(val.to_s24_4_be(), ([0, 223, 33, 137], false));
+        let val: f64 = 1.1;
+        assert_eq!(val.to_s24_4_be(), ([0, 127, 255, 255], true));
+        let val: f64 = -1.1;
+        assert_eq!(val.to_s24_4_be(), ([0, 128, 0, 0], true));
+    }
+
+    #[test]
     fn check_f64_to_s16le() {
         let val: f64 = 0.256789;
         assert_eq!(val.to_s16_le(), ([222, 32], false));
         let val: f64 = -0.256789;
         assert_eq!(val.to_s16_le(), ([34, 223], false));
+    }
+
+    #[test]
+    fn check_f64_to_s16be() {
+        let val: f64 = 0.256789;
+        assert_eq!(val.to_s16_be(), ([32, 222], false));
+        let val: f64 = -0.256789;
+        assert_eq!(val.to_s16_be(), ([223, 34], false));
     }
 
     #[test]
@@ -592,6 +833,22 @@ mod tests {
     }
 
     #[test]
+    fn check_f64_to_f32be() {
+        let val: f64 = 0.256789;
+        let exp = (0.256789 as f32).to_be_bytes();
+        assert_eq!(val.to_f32_be(), (exp, false));
+        let val: f64 = -0.256789;
+        let exp = (-0.256789 as f32).to_be_bytes();
+        assert_eq!(val.to_f32_be(), (exp, false));
+        let val: f64 = 1.1;
+        let exp = (1.0 as f32).to_be_bytes();
+        assert_eq!(val.to_f32_be(), (exp, true));
+        let val: f64 = -1.1;
+        let exp = (-1.0 as f32).to_be_bytes();
+        assert_eq!(val.to_f32_be(), (exp, true));
+    }
+
+    #[test]
     fn check_f64_to_f64le() {
         let val: f64 = 0.256789;
         let exp = (0.256789 as f64).to_le_bytes();
@@ -605,6 +862,22 @@ mod tests {
         let val: f64 = -1.1;
         let exp = (-1.0 as f64).to_le_bytes();
         assert_eq!(val.to_f64_le(), (exp, true));
+    }
+
+    #[test]
+    fn check_f64_to_f64be() {
+        let val: f64 = 0.256789;
+        let exp = (0.256789 as f64).to_be_bytes();
+        assert_eq!(val.to_f64_be(), (exp, false));
+        let val: f64 = -0.256789;
+        let exp = (-0.256789 as f64).to_be_bytes();
+        assert_eq!(val.to_f64_be(), (exp, false));
+        let val: f64 = 1.1;
+        let exp = (1.0 as f64).to_be_bytes();
+        assert_eq!(val.to_f64_be(), (exp, true));
+        let val: f64 = -1.1;
+        let exp = (-1.0 as f64).to_be_bytes();
+        assert_eq!(val.to_f64_be(), (exp, true));
     }
 
     // -------------------
@@ -667,6 +940,18 @@ mod tests {
     }
 
     #[test]
+    fn check_f32_to_s243be() {
+        let val: f32 = 0.256789;
+        assert_eq!(val.to_s24_3_be(), ([32, 222, 118], false));
+        let val: f32 = -0.256789;
+        assert_eq!(val.to_s24_3_be(), ([223, 33, 137], false));
+        let val: f32 = 1.1;
+        assert_eq!(val.to_s24_3_be(), ([127, 255, 255], true));
+        let val: f32 = -1.1;
+        assert_eq!(val.to_s24_3_be(), ([128, 0, 0], true));
+    }
+
+    #[test]
     fn check_f32_from_s243le() {
         let data = [0, 64, 32];
         assert_eq!(f32::from_s24_3_le(data), 0.251953125);
@@ -677,6 +962,16 @@ mod tests {
     }
 
     #[test]
+    fn check_f32_from_s243be() {
+        let data = [32, 64, 0];
+        assert_eq!(f32::from_s24_3_be(data), 0.251953125);
+        let data = [223, 64, 0];
+        assert_eq!(f32::from_s24_3_be(data), -0.255859375);
+        let data = [128, 0, 0];
+        assert_eq!(f32::from_s24_3_be(data), -1.0);
+    }
+
+    #[test]
     fn check_f32_from_s244le() {
         let data = [0, 64, 32, 0];
         assert_eq!(f32::from_s24_4_le(data), 0.251953125);
@@ -684,6 +979,16 @@ mod tests {
         assert_eq!(f32::from_s24_4_le(data), -0.255859375);
         let data = [0, 0, 128, 0];
         assert_eq!(f32::from_s24_4_le(data), -1.0);
+    }
+
+    #[test]
+    fn check_f32_from_s244be() {
+        let data = [0, 32, 64, 0];
+        assert_eq!(f32::from_s24_4_be(data), 0.251953125);
+        let data = [0, 223, 64, 0];
+        assert_eq!(f32::from_s24_4_be(data), -0.255859375);
+        let data = [0, 128, 0, 0];
+        assert_eq!(f32::from_s24_4_be(data), -1.0);
     }
 
     #[test]
@@ -699,12 +1004,32 @@ mod tests {
     }
 
     #[test]
+    fn check_f32_to_s244be() {
+        let val: f32 = 0.256789;
+        assert_eq!(val.to_s24_4_be(), ([0, 32, 222, 118], false));
+        let val: f32 = -0.256789;
+        assert_eq!(val.to_s24_4_be(), ([0, 223, 33, 137], false));
+        let val: f32 = 1.1;
+        assert_eq!(val.to_s24_4_be(), ([0, 127, 255, 255], true));
+        let val: f32 = -1.1;
+        assert_eq!(val.to_s24_4_be(), ([0, 128, 0, 0], true));
+    }
+
+    #[test]
     fn check_f32_to_s16le() {
         let val: f32 = 0.256789;
         assert_eq!(val.to_s16_le(), ([222, 32], false));
         let val: f32 = -0.256789;
         assert_eq!(val.to_s16_le(), ([34, 223], false));
     }
+
+    #[test]
+    fn check_f32_to_s16be() {
+        let val: f32 = 0.256789;
+        assert_eq!(val.to_s16_be(), ([32, 222], false));
+        let val: f32 = -0.256789;
+        assert_eq!(val.to_s16_be(), ([223, 34], false));
+    }    
 
     #[test]
     fn check_f32_to_f32le() {
@@ -723,6 +1048,22 @@ mod tests {
     }
 
     #[test]
+    fn check_f32_to_f32be() {
+        let val: f32 = 0.256789;
+        let exp = (0.256789 as f32).to_be_bytes();
+        assert_eq!(val.to_f32_be(), (exp, false));
+        let val: f32 = -0.256789;
+        let exp = (-0.256789 as f32).to_be_bytes();
+        assert_eq!(val.to_f32_be(), (exp, false));
+        let val: f32 = 1.1;
+        let exp = (1.0 as f32).to_be_bytes();
+        assert_eq!(val.to_f32_be(), (exp, true));
+        let val: f32 = -1.1;
+        let exp = (-1.0 as f32).to_be_bytes();
+        assert_eq!(val.to_f32_be(), (exp, true));
+    }
+
+    #[test]
     fn check_f32_to_f64le() {
         let val: f32 = 0.256789;
         let exp = ((0.256789 as f32) as f64).to_le_bytes();
@@ -738,6 +1079,22 @@ mod tests {
         assert_eq!(val.to_f64_le(), (exp, true));
     }
 
+    #[test]
+    fn check_f32_to_f64be() {
+        let val: f32 = 0.256789;
+        let exp = ((0.256789 as f32) as f64).to_be_bytes();
+        assert_eq!(val.to_f64_be(), (exp, false));
+        let val: f32 = -0.256789;
+        let exp = ((-0.256789 as f32) as f64).to_be_bytes();
+        assert_eq!(val.to_f64_be(), (exp, false));
+        let val: f32 = 1.1;
+        let exp = (1.0 as f64).to_be_bytes();
+        assert_eq!(val.to_f64_be(), (exp, true));
+        let val: f32 = -1.1;
+        let exp = (-1.0 as f64).to_be_bytes();
+        assert_eq!(val.to_f64_be(), (exp, true));
+    }
+
     // -----------------
     //  read/write many
     // -----------------
@@ -751,6 +1108,18 @@ mod tests {
         let mut values2 = vec![0.0; 7];
         let mut slice: &[u8] = &data;
         f64::read_samples(&mut slice, &mut values2, &SampleFormat::S16LE).unwrap();
+        assert_eq!(values, values2);
+    }
+
+    #[test]
+    fn write_read_to_slice_s16be() {
+        // write data, then read it back into a slice of the same length.
+        let values = vec![-0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5];
+        let mut data: Vec<u8> = Vec::new();
+        f64::write_samples(&values, &mut data, &SampleFormat::S16BE).unwrap();
+        let mut values2 = vec![0.0; 7];
+        let mut slice: &[u8] = &data;
+        f64::read_samples(&mut slice, &mut values2, &SampleFormat::S16BE).unwrap();
         assert_eq!(values, values2);
     }
 

@@ -5,7 +5,8 @@ A library for working with raw audio samples.
 Most audio APIs work with buffers of bytes. 
 To do anything with the sample values, these raw bytes must be converted to and from numeric types.
 
-This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values. Both f32 and f64 are supported.
+This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values. 
+Both f32 and f64 are supported, as well as both big-endian and little-endian byte order.
 
 ```rust
 use rawsample::{SampleWriter, SampleReader, SampleFormat};
