@@ -5,7 +5,7 @@
 //! Most audio APIs work with buffers of bytes.
 //! To do anything with the sample values, these raw bytes must be converted to and from numeric types.
 //!
-//! This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values. 
+//! This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values.
 //! Both f32 and f64 are supported, as well as both big-endian and little-endian byte order.
 //!
 //! ```rust
@@ -29,6 +29,8 @@ use num_traits::{Bounded, Float, ToPrimitive};
 use std::error::Error;
 use std::io::ErrorKind;
 use std::io::{Read, Write};
+
+pub mod wrapper;
 
 /// The Sample trait is used for low-level conversions of samples stored as raw bytes, to f32 or f64 sample values.
 ///
@@ -130,6 +132,26 @@ pub enum SampleFormat {
     F64BE,
 }
 
+impl SampleFormat {
+    /// Get the number of bytes that the format uses to store each sample.
+    pub fn bytes_per_sample(&self) -> usize {
+        match self {
+            SampleFormat::S16LE => 2,
+            SampleFormat::S16BE => 2,
+            SampleFormat::S24LE3 => 3,
+            SampleFormat::S24BE3 => 3,
+            SampleFormat::S24LE4 => 4,
+            SampleFormat::S24BE4 => 4,
+            SampleFormat::S32LE => 4,
+            SampleFormat::S32BE => 4,
+            SampleFormat::F32LE => 4,
+            SampleFormat::F32BE => 4,
+            SampleFormat::F64LE => 8,
+            SampleFormat::F64BE => 8,
+        }
+    }
+}
+
 macro_rules! write_samples {
     ($values:expr, $target:expr, $conv:ident) => {{
         let mut nbr_clipped = 0;
@@ -159,45 +181,44 @@ pub trait SampleWriter<T: Sample<T>> {
         target: &mut dyn Write,
         sformat: &SampleFormat,
     ) -> Result<usize, Box<dyn Error>> {
-        let nbr_clipped;
-        match sformat {
+        let nbr_clipped = match sformat {
             SampleFormat::S16LE => {
-                nbr_clipped = write_samples!(values, target, to_s16_le);
+                write_samples!(values, target, to_s16_le)
             }
             SampleFormat::S16BE => {
-                nbr_clipped = write_samples!(values, target, to_s16_be);
+                write_samples!(values, target, to_s16_be)
             }
             SampleFormat::S24LE3 => {
-                nbr_clipped = write_samples!(values, target, to_s24_3_le);
+                write_samples!(values, target, to_s24_3_le)
             }
             SampleFormat::S24BE3 => {
-                nbr_clipped = write_samples!(values, target, to_s24_3_be);
+                write_samples!(values, target, to_s24_3_be)
             }
             SampleFormat::S24LE4 => {
-                nbr_clipped = write_samples!(values, target, to_s24_4_le);
+                write_samples!(values, target, to_s24_4_le)
             }
             SampleFormat::S24BE4 => {
-                nbr_clipped = write_samples!(values, target, to_s24_4_be);
+                write_samples!(values, target, to_s24_4_be)
             }
             SampleFormat::S32LE => {
-                nbr_clipped = write_samples!(values, target, to_s32_le);
+                write_samples!(values, target, to_s32_le)
             }
             SampleFormat::S32BE => {
-                nbr_clipped = write_samples!(values, target, to_s32_be);
+                write_samples!(values, target, to_s32_be)
             }
             SampleFormat::F32LE => {
-                nbr_clipped = write_samples!(values, target, to_f32_le);
+                write_samples!(values, target, to_f32_le)
             }
             SampleFormat::F32BE => {
-                nbr_clipped = write_samples!(values, target, to_f32_be);
+                write_samples!(values, target, to_f32_be)
             }
             SampleFormat::F64LE => {
-                nbr_clipped = write_samples!(values, target, to_f64_le);
+                write_samples!(values, target, to_f64_le)
             }
             SampleFormat::F64BE => {
-                nbr_clipped = write_samples!(values, target, to_f64_be);
+                write_samples!(values, target, to_f64_be)
             }
-        }
+        };
         Ok(nbr_clipped)
     }
 }
@@ -256,45 +277,44 @@ pub trait SampleReader<T: Sample<T>> {
         samples: &mut [T],
         sampleformat: &SampleFormat,
     ) -> Result<usize, Box<dyn Error>> {
-        let nbr_read;
-        match sampleformat {
+        let nbr_read = match sampleformat {
             SampleFormat::S16LE => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s16_le, 2);
+                read_samples_to_slice!(rawbytes, samples, from_s16_le, 2)
             }
             SampleFormat::S16BE => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s16_be, 2);
+                read_samples_to_slice!(rawbytes, samples, from_s16_be, 2)
             }
             SampleFormat::S24LE3 => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s24_3_le, 3);
+                read_samples_to_slice!(rawbytes, samples, from_s24_3_le, 3)
             }
             SampleFormat::S24BE3 => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s24_3_be, 3);
+                read_samples_to_slice!(rawbytes, samples, from_s24_3_be, 3)
             }
             SampleFormat::S24LE4 => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s24_4_le, 4);
+                read_samples_to_slice!(rawbytes, samples, from_s24_4_le, 4)
             }
             SampleFormat::S24BE4 => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s24_4_be, 4);
+                read_samples_to_slice!(rawbytes, samples, from_s24_4_be, 4)
             }
             SampleFormat::S32LE => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s32_le, 4);
+                read_samples_to_slice!(rawbytes, samples, from_s32_le, 4)
             }
             SampleFormat::S32BE => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_s32_be, 4);
+                read_samples_to_slice!(rawbytes, samples, from_s32_be, 4)
             }
             SampleFormat::F32LE => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_f32_le, 4);
+                read_samples_to_slice!(rawbytes, samples, from_f32_le, 4)
             }
             SampleFormat::F32BE => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_f32_be, 4);
+                read_samples_to_slice!(rawbytes, samples, from_f32_be, 4)
             }
             SampleFormat::F64LE => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_f64_le, 8);
+                read_samples_to_slice!(rawbytes, samples, from_f64_le, 8)
             }
             SampleFormat::F64BE => {
-                nbr_read = read_samples_to_slice!(rawbytes, samples, from_f64_be, 8);
+                read_samples_to_slice!(rawbytes, samples, from_f64_be, 8)
             }
-        }
+        };
         Ok(nbr_read)
     }
 
@@ -701,7 +721,6 @@ mod tests {
         assert_eq!(val.to_s32_be(), ([128, 0, 0, 0], true));
     }
 
-
     #[test]
     fn check_f64_from_s32be() {
         let data = [32, 64, 0, 0];
@@ -1029,7 +1048,7 @@ mod tests {
         assert_eq!(val.to_s16_be(), ([32, 222], false));
         let val: f32 = -0.256789;
         assert_eq!(val.to_s16_be(), ([223, 34], false));
-    }    
+    }
 
     #[test]
     fn check_f32_to_f32le() {

@@ -1,6 +1,6 @@
 [package]
 name = "rawsample"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2018"
 authors = ["HEnquist <henrik.enquist@gmail.com>"]
 description = "A library for working with raw audio samples."
@@ -14,3 +14,4 @@ readme = "README.md"
 
 [dependencies]
 num-traits = "0.2"
+paste = "1.0.12"
