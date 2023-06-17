@@ -1,3 +1,36 @@
+//! # Converting wrappers
+//! This module provides wrappers for slices of bytes.
+//! The wrapper enables reading and writing samples from/to the byte slice with
+//! on-the-fly format conversion.
+//! 
+//! The wrappers implement the traits [Converter] and [ConverterMut],
+//! that provide simple methods for accessing the audio samples of a buffer.
+//!
+//! ## Abstracting the data layout
+//! 
+//! ### Channels and frames
+//! When audio data has more than one channel, it is made up of a series of _frames_.
+//! A frame consists of the samples for all channels, belonging to one time point.
+//! For normal stereo, a frame consists of one sample for the left channel
+//! and one for the right, usually in that order.
+//!
+//! ### Interleaved and sequential
+//! When the audio data is stored in a file or in memory,
+//! the data can be arranged in two main ways.
+//! - Keeping all samples for each channel together,
+//!   and storing each channel after the previous.
+//!   This is normally called _sequential_, _non-interleaved_ or _planar_.
+//!   The sample order of a stereo file with 3 frames becomes:
+//!   `L1, L2, L3, R1, R2, R3`
+//! - Keeping all samples for each frame together,
+//!   and storing each frame after the previous.
+//!   This is normally called _interleaved_, and this is how the data in a .wav file is ordered.
+//!   The sample order of a stereo file with 3 frames becomes:
+//!   `L1, R1, L2, R2, L3, R3`
+//!
+
+
+
 use std::convert::TryInto;
 use std::error;
 use std::fmt;
@@ -61,7 +94,7 @@ macro_rules! check_slice_length {
 
 /// A trait for providing immutable access to samples in a buffer.
 /// Samples are converted from the raw format on the fly.
-pub trait ConvertingAudioBuffer<'a, T: 'a> {
+pub trait Converter<'a, T: 'a> {
     /// Read and convert the sample at
     /// a given combination of frame and channel.
     ///
@@ -76,7 +109,7 @@ pub trait ConvertingAudioBuffer<'a, T: 'a> {
     /// Read and convert the sample at
     /// a given combination of frame and channel.
     /// Returns `None` if the frame or channel is
-    /// out of bounds of the `ConvertingAudioBuffer`.
+    /// out of bounds of the `Converter`.
     fn read(&self, channel: usize, frame: usize) -> Option<T> {
         if channel >= self.channels() || frame >= self.frames() {
             return None;
@@ -84,16 +117,16 @@ pub trait ConvertingAudioBuffer<'a, T: 'a> {
         Some(unsafe { self.read_unchecked(channel, frame) })
     }
 
-    /// Get the number of channels stored in this `ConvertingAudioBuffer`.
+    /// Get the number of channels stored in this `Converter`.
     fn channels(&self) -> usize;
 
-    /// Get the number of frames stored in this `ConvertingAudioBuffer`.
+    /// Get the number of frames stored in this `Converter`.
     fn frames(&self) -> usize;
 
-    /// Convert and write values from a channel of the `ConvertingAudioBuffer` to a slice.
-    /// The `start` argument is the offset into the `ConvertingAudioBuffer` channel
+    /// Convert and write values from a channel of the `Converter` to a slice.
+    /// The `start` argument is the offset into the `Converter` channel
     /// where the first value will be read from.
-    /// If the slice is longer than the available number of values in the `ConvertingAudioBuffer` channel,
+    /// If the slice is longer than the available number of values in the `Converter` channel,
     /// then only the available number of samples will be written.
     ///
     /// Returns the number of values written.
@@ -115,10 +148,10 @@ pub trait ConvertingAudioBuffer<'a, T: 'a> {
         frames_to_write
     }
 
-    /// Convert and write values from a frame of the `ConvertingAudioBuffer` to a slice.
-    /// The `start` argument is the offset into the `ConvertingAudioBuffer` frame
+    /// Convert and write values from a frame of the `Converter` to a slice.
+    /// The `start` argument is the offset into the `Converter` frame
     /// where the first value will be read from.
-    /// If the slice is longer than the available number of values in the `ConvertingAudioBuffer` frame,
+    /// If the slice is longer than the available number of values in the `Converter` frame,
     /// then only the available number of samples will be written.
     ///
     /// Returns the number of values written.
@@ -143,7 +176,7 @@ pub trait ConvertingAudioBuffer<'a, T: 'a> {
 
 /// A trait for providing mutable access to samples in a buffer.
 /// Samples are converted to the raw format on the fly.
-pub trait ConvertingAudioBufferMut<'a, T>: ConvertingAudioBuffer<'a, T>
+pub trait ConverterMut<'a, T>: Converter<'a, T>
 where
     T: Clone + 'a,
 {
@@ -161,7 +194,7 @@ where
     /// Convert and write a sample to the
     /// given combination of frame and channel.
     /// Returns `None` if the frame or channel is
-    /// out of bounds of the `ConvertingAudioBuffer`.
+    /// out of bounds of the `Converter`.
     fn write(&mut self, channel: usize, frame: usize, value: &T) -> Option<bool> {
         if channel >= self.channels() || frame >= self.frames() {
             return None;
@@ -169,10 +202,10 @@ where
         Some(unsafe { self.write_unchecked(channel, frame, value) })
     }
 
-    /// Write values from a slice into a channel of the `ConvertingAudioBuffer`.
-    /// The `start` argument is the offset into the `ConvertingAudioBuffer` channel
+    /// Write values from a slice into a channel of the `Converter`.
+    /// The `start` argument is the offset into the `Converter` channel
     /// where the first value will be written.
-    /// If the slice is longer than the available space in the `ConvertingAudioBuffer` channel,
+    /// If the slice is longer than the available space in the `Converter` channel,
     /// then only the number of samples that fit will be read.
     ///
     /// Returns a tuple of two numbers.
@@ -202,10 +235,10 @@ where
         (frames_to_read, nbr_clipped)
     }
 
-    /// Write values from a slice into a frame of the `ConvertingAudioBuffer`.
-    /// The `start` argument is the offset into the `ConvertingAudioBuffer` frame
+    /// Write values from a slice into a frame of the `Converter`.
+    /// The `start` argument is the offset into the `Converter` frame
     /// where the first value will be written.
-    /// If the slice is longer than the available space in the `ConvertingAudioBuffer` frame,
+    /// If the slice is longer than the available space in the `Converter` frame,
     /// then only the number of samples that fit will be read.
     ///
     /// Returns a tuple of two numbers.
@@ -239,6 +272,7 @@ where
 macro_rules! create_structs {
     ($type:expr, $read_func:ident, $write_func:ident, $bytes:expr, $typename:ident) => {
         paste::item! {
+            #[doc = "A wrapper for a slice of bytes containing interleaved samples in the `" $typename "` format."]
             pub struct [< Interleaved $typename >]<U, V> {
                 _phantom: core::marker::PhantomData<V>,
                 buf: U,
@@ -247,6 +281,7 @@ macro_rules! create_structs {
                 bytes_per_sample: usize,
             }
 
+            #[doc = "A wrapper for a slice of bytes containing sequential samples in the `" $typename "` format."]
             pub struct [< Sequential $typename >]<U, V> {
                 _phantom: core::marker::PhantomData<V>,
                 buf: U,
@@ -279,11 +314,13 @@ macro_rules! impl_traits {
             where
                 T: 'a,
             {
-                /// Create a new wrapper for an interleaved slice.
-                /// The slice length must be at least `frames * channels * bytes_per_sample`.
-                /// It is allowed to be longer than needed,
-                /// but these extra values cannot
-                /// be accessed via the `ConvertingAudioBuffer` trait methods.
+                #[doc = "Create a new wrapper for a slice of bytes,"]
+                #[doc = "containing samples of type `" $typename "`,"]
+                #[doc = "stored in _" $order:lower "_ order."]
+                #[doc = "The slice length must be at least `" $bytes "*frames*channels`."]
+                #[doc = "It is allowed to be longer than needed,"]
+                #[doc = "but these extra values cannot"]
+                #[doc = "be accessed via the `Converter` trait methods."]
                 pub fn new(
                     buf: &'a [u8],
                     channels: usize,
@@ -304,11 +341,13 @@ macro_rules! impl_traits {
             where
                 T: 'a,
             {
-                /// Create a new wrapper for an interleaved mutable slice.
-                /// The slice length must be at least `frames * channels * bytes_per_sample`.
-                /// It is allowed to be longer than needed,
-                /// but these extra values cannot
-                /// be accessed via the `ConvertingAudioBuffer` trait methods.
+                #[doc = "Create a new wrapper for a mutable slice of bytes,"]
+                #[doc = "containing samples of type `" $typename "`,"]
+                #[doc = "stored in _" $order:lower "_ order."]
+                #[doc = "The slice length must be at least `" $bytes " *frames*channels`."]
+                #[doc = "It is allowed to be longer than needed,"]
+                #[doc = "but these extra values cannot"]
+                #[doc = "be accessed via the `Converter` trait methods."]
                 pub fn new_mut(
                     buf: &'a mut [u8],
                     channels: usize,
@@ -325,7 +364,7 @@ macro_rules! impl_traits {
                 }
             }
 
-            impl<'a, T> ConvertingAudioBuffer<'a, T> for [< $order $typename >]<&'a [u8], T>
+            impl<'a, T> Converter<'a, T> for [< $order $typename >]<&'a [u8], T>
             where
                 T: Sample<T> + 'a,
             {
@@ -341,7 +380,7 @@ macro_rules! impl_traits {
                 implement_size_getters!();
             }
 
-            impl<'a, T> ConvertingAudioBuffer<'a, T> for [< $order $typename >]<&'a mut [u8], T>
+            impl<'a, T> Converter<'a, T> for [< $order $typename >]<&'a mut [u8], T>
             where
                 T: Sample<T> + Clone + 'a,
             {
@@ -357,7 +396,7 @@ macro_rules! impl_traits {
                 implement_size_getters!();
             }
 
-            impl<'a, T> ConvertingAudioBufferMut<'a, T> for [< $order $typename >]<&'a mut [u8], T>
+            impl<'a, T> ConverterMut<'a, T> for [< $order $typename >]<&'a mut [u8], T>
             where
                 T: Sample<T> + Clone + 'a,
             {
