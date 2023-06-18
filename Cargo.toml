@@ -1,0 +1,13 @@
+[workspace]
+
+members = [
+    "audioboiler_buffers",
+    "audioboiler_traits",
+    "rawsample",
+]
+
+default-members = [
+    "audioboiler_buffers",
+    "audioboiler_traits",
+    "rawsample",
+]
