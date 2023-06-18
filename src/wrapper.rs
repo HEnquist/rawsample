@@ -2,19 +2,19 @@
 //! This module provides wrappers for slices of bytes.
 //! The wrapper enables reading and writing samples from/to the byte slice with
 //! on-the-fly format conversion.
-//! 
-//! The wrappers implement the traits [Converter] and [ConverterMut],
+//!
+//! The wrappers implement the traits [wrapper::Converter] and [wrapper::ConverterMut],
 //! that provide simple methods for accessing the audio samples of a buffer.
 //!
 //! ## Abstracting the data layout
-//! 
+//!
 //! ### Channels and frames
 //! When audio data has more than one channel, it is made up of a series of _frames_.
 //! A frame consists of the samples for all channels, belonging to one time point.
 //! For normal stereo, a frame consists of one sample for the left channel
 //! and one for the right, usually in that order.
 //!
-//! ### Interleaved and sequential
+//! ### Interleaved and sequential layout
 //! When the audio data is stored in a file or in memory,
 //! the data can be arranged in two main ways.
 //! - Keeping all samples for each channel together,
@@ -28,8 +28,37 @@
 //!   The sample order of a stereo file with 3 frames becomes:
 //!   `L1, R1, L2, R2, L3, R3`
 //!
-
-
+//! ### Wrappers
+//! There are two wrappers availabe for each sample format,
+//! one for interleaved and one for sequential data.
+//! By using the appropriate wrapper, the sample values can be
+//! easily accessed via the trait methods, which means an application
+//! can handle both layouts without any extra code.
+//!
+//! ### Example
+//! Wrap a Vec of bytes as an interleaved buffer of 16-bit integer samples
+//! and print all the values.
+//! ```
+//! use rawsample::wrapper::{Converter, InterleavedS16LE};
+//!
+//! // make a vector with some fake data.
+//! // 2 channels * 3 frames * 2 bytes per sample => 12 bytes
+//! let data: Vec<u8> = vec![0, 0, 0, 128, 0, 64, 0, 192, 0, 32, 0, 224];
+//!
+//! // wrap the data
+//! let buffer: InterleavedS16LE<&[u8], f32> = InterleavedS16LE::new(&data, 2, 3).unwrap();
+//!
+//! // Loop over all samples and print their values
+//! for channel in 0..2 {
+//!     for frame in 0..3 {
+//!         let value = buffer.read(channel, frame).unwrap();
+//!         println!(
+//!             "Channel: {}, frame: {}, value: {}",
+//!             channel, frame, value
+//!         );
+//!     }
+//! }
+//! ```
 
 use std::convert::TryInto;
 use std::error;
