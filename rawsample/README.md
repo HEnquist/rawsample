@@ -25,12 +25,3 @@ let mut slice: &[u8] = &rawbytes;
 // read the raw bytes back as samples into the new vec 
 f64::read_all_samples(&mut slice, &mut values2, &SampleFormat::S32LE).unwrap();
 ```
-
-## On-the-fly conversion
-
-Instead of converting all values before using the data,
-it's possible to perform the conversion when reading and writing each sample.
-This is achieved by wrapping a slice of bytes with a structure that implements
-the [wrapper::Converter] (and optionally the [wrapper::ConverterMut]) trait.
-
-See the [wrapper] module for details.
