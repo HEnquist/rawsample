@@ -574,8 +574,7 @@ mod tests {
         let expected_right = vec![-1.0, -0.5, -0.25];
         let mut values_left = vec![0.0; 3];
         let mut values_right = vec![0.0; 3];
-        let buffer: InterleavedS32LE<&[u8], f32> =
-            InterleavedS32LE::new(&data, 2, 3).unwrap();
+        let buffer: InterleavedS32LE<&[u8], f32> = InterleavedS32LE::new(&data, 2, 3).unwrap();
 
         buffer.write_from_channel_to_slice(0, 0, &mut values_left);
         buffer.write_from_channel_to_slice(1, 0, &mut values_right);
