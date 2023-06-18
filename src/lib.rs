@@ -6,9 +6,6 @@ use std::error::Error;
 use std::io::ErrorKind;
 use std::io::{Read, Write};
 
-/// Wrappers for raw data that performs on-the-fly conversion when reading and writing samples.
-pub mod wrapper;
-
 /// The Sample trait is used for low-level conversions of samples stored as raw bytes, to f32 or f64 sample values.
 ///
 /// The float values are expected to use the range -1.0 <= value < +1.0.
