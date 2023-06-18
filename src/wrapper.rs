@@ -548,4 +548,38 @@ mod tests {
         buffer.write(1, 2, &-0.25).unwrap();
         assert_eq!(data, expected);
     }
+
+    #[test]
+    fn from_slice_i32() {
+        let expected_data: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 64, 0, 0, 0, 192, 0, 0, 0, 32, 0, 0, 0, 224,
+        ];
+        let values_left = vec![0.0, 0.5, 0.25];
+        let values_right = vec![-1.0, -0.5, -0.25];
+        let mut data = vec![0; 24];
+        let mut buffer: InterleavedS32LE<&mut [u8], f32> =
+            InterleavedS32LE::new_mut(&mut data, 2, 3).unwrap();
+
+        buffer.write_from_slice_to_channel(0, 0, &values_left);
+        buffer.write_from_slice_to_channel(1, 0, &values_right);
+        assert_eq!(data, expected_data);
+    }
+
+    #[test]
+    fn to_slice_i32() {
+        let data: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 64, 0, 0, 0, 192, 0, 0, 0, 32, 0, 0, 0, 224,
+        ];
+        let expected_left = vec![0.0, 0.5, 0.25];
+        let expected_right = vec![-1.0, -0.5, -0.25];
+        let mut values_left = vec![0.0; 3];
+        let mut values_right = vec![0.0; 3];
+        let buffer: InterleavedS32LE<&[u8], f32> =
+            InterleavedS32LE::new(&data, 2, 3).unwrap();
+
+        buffer.write_from_channel_to_slice(0, 0, &mut values_left);
+        buffer.write_from_channel_to_slice(1, 0, &mut values_right);
+        assert_eq!(values_left, expected_left);
+        assert_eq!(values_right, expected_right);
+    }
 }
