@@ -6,7 +6,15 @@ Most audio APIs work with buffers of bytes.
 To do anything with the sample values, these raw bytes must be converted to and from numeric types.
 
 This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values. 
-Both f32 and f64 are supported, as well as both big-endian and little-endian byte order.
+Both `f32` and `f64` are supported, as well as both big-endian and little-endian byte order.
+
+Methods are also provided for converting samples between floats (`f32` and `f64`) and integers (`i16` and `i32`). 
+
+When samples are converted, the amplitude is scaled to fit the new type.
+For floats, the values +/- 1.0 are considered full amplitude.
+Higher and lower values are possible, but they will be clipped if the sample is converted to an integer type.
+For integer types, full amplitude is simply the minimum and maximum possible values of the type.
+
 
 ## Example: 
 

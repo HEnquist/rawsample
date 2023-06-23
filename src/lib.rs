@@ -6,12 +6,12 @@ use std::error::Error;
 use std::io::ErrorKind;
 use std::io::{Read, Write};
 
-/// The Sample trait is used for low-level conversions of samples stored as raw bytes, to f32 or f64 sample values.
+/// The `Sample` trait is used for low-level conversions of samples stored as raw bytes, to `f32` or `f64` sample values.
 ///
 /// The float values are expected to use the range -1.0 <= value < +1.0.
 /// The integer types are mapped to this range.
-/// Using f32, up to 24 byte integers can be converted without loss to and from float.
-/// 32-bit integers required the use of f64 for lossless conversion.
+/// Using `f32`, up to 24 byte integers can be converted without loss to and from float.
+/// 32-bit integers required the use of `f64` for lossless conversion.
 ///
 /// The exact range depends on the format. The lower limit is always -1.0. But the upper limit is (2^(n-1)-1)/2^(n-1).
 /// For example for 16-bit integer, the maximum value is (2^15-1)/2^15, approximately +0.99997.
@@ -143,12 +143,12 @@ macro_rules! write_samples {
 /// The SampleWriter trait enables converting and writing many sample values from a slice.
 pub trait SampleWriter<T: Sample<T>> {
     /// Write sample values from a slice to anything that implements the "Write" trait.
-    /// This can be for example a file, or a Vec of u8.
-    /// Input samples are f32 or f64, and are converted to the given sample format.
+    /// This can be for example a file, or a `Vec` of `u8`.
+    /// Input samples are `f32` or `f64`, and are converted to the given sample format.
     /// The sample values are clamped to the range supported by the output format.
     /// For the float types, the input range is -1.0 to +1.0.
     /// For the integer types, the input range doesn't include 1.0.
-    /// For example for I16 the maximum value is (2^15-1)/2^15, approximately +0.99997.
+    /// For example for `i16` the maximum value is (2^15-1)/2^15, approximately +0.99997.
     /// The number of clipped samples is returned.
     fn write_samples(
         values: &[T],
@@ -240,9 +240,9 @@ macro_rules! read_all_samples_to_vec {
 /// The SampleReader trait enables reading and converting raw bytes and to multiple samples.
 
 pub trait SampleReader<T: Sample<T>> {
-    /// Read bytes from anything that implements the "Read" trait.
-    /// This can be for example a file, or a slice of u8.
-    /// The bytes are then converted to f32 or f64 values, and stored in a slice.
+    /// Read bytes from anything that implements the [std::io::Read] trait.
+    /// This can be for example a file, or a slice of `u8`.
+    /// The bytes are then converted to `f32` or `f64` values, and stored in a slice.
     /// It will read until the samples slice is filled.
     /// If end-of-file of the source is reached before the slice is filled, the remaining values of the slice are left untouched.
     /// The number of samples read is returned.
@@ -293,8 +293,8 @@ pub trait SampleReader<T: Sample<T>> {
     }
 
     /// Read all bytes from anything that implements the "Read" trait.
-    /// This can be for example a file, or a slice of u8.
-    /// The bytes are then converted to f32 or f64 values, and appended to a vec.
+    /// This can be for example a file, or a slice of `u8`.
+    /// The bytes are then converted to `f32` or `f64` values, and appended to a vec.
     /// It will continue reading until reaching end-of-file of the source.
     /// The number of samples read is returned.
     fn read_all_samples(
@@ -650,8 +650,70 @@ impl Sample<f32> for f32 {
     }
 }
 
+/// The IntegerSample trait is used for conversions of samples
+/// stored as integer values (`i32` or `i16`), to `f32` or `f64` sample values.
+///
+/// The trait methods are similar to the [Sample] methods,
+/// but convert to and from integers values instead of raw bytes.
+pub trait IntegerSample<T: Sized> {
+    /// Convert a sample value to `i16`
+    fn to_i16(&self) -> (i16, bool);
+    /// Convert a sample value to `i32`
+    fn to_i32(&self) -> (i32, bool);
+
+    /// Convert `i16` to a sample value
+    fn from_i16(value: i16) -> Self;
+    /// Convert `i32` to a sample value
+    fn from_i32(value: i32) -> Self;
+}
+
+impl IntegerSample<f32> for f32 {
+    fn to_i16(&self) -> (i16, bool) {
+        let val = self * f32::MAX_I16;
+        let (val, clipped) = clamp_int::<f32, i16>(val);
+        (val as i16, clipped)
+    }
+
+    fn to_i32(&self) -> (i32, bool) {
+        let val = self * f32::MAX_I32;
+        let (val, clipped) = clamp_int::<f32, i32>(val);
+        (val as i32, clipped)
+    }
+
+    fn from_i16(value: i16) -> Self {
+        f32::from(value) / f32::MAX_I16
+    }
+
+    fn from_i32(value: i32) -> Self {
+        value as f32 / f32::MAX_I32
+    }
+}
+
+impl IntegerSample<f64> for f64 {
+    fn to_i16(&self) -> (i16, bool) {
+        let val = self * f64::MAX_I16;
+        let (val, clipped) = clamp_int::<f64, i16>(val);
+        (val as i16, clipped)
+    }
+
+    fn to_i32(&self) -> (i32, bool) {
+        let val = self * f64::MAX_I32;
+        let (val, clipped) = clamp_int::<f64, i32>(val);
+        (val as i32, clipped)
+    }
+
+    fn from_i16(value: i16) -> Self {
+        f64::from(value) / f64::MAX_I16
+    }
+
+    fn from_i32(value: i32) -> Self {
+        value as f64 / f64::MAX_I32
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::IntegerSample;
     use crate::Sample;
     use crate::SampleFormat;
     use crate::SampleReader;
@@ -1163,5 +1225,107 @@ mod tests {
         f64::read_samples(&mut slice, &mut values2, &SampleFormat::S16LE).unwrap();
         let expected = vec![-0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 0.75, 0.75];
         assert_eq!(expected, values2);
+    }
+
+    // -------------------
+    //  single values to integers
+    // -------------------
+    #[test]
+    fn check_f32_to_i16() {
+        let val: f32 = 0.25;
+        assert_eq!(val.to_i16(), (2 << 12, false));
+        let val: f32 = -0.25;
+        assert_eq!(val.to_i16(), (-2 << 12, false));
+        let val: f32 = 1.1;
+        assert_eq!(val.to_i16(), (i16::MAX, true));
+        let val: f32 = -1.1;
+        assert_eq!(val.to_i16(), (i16::MIN, true));
+    }
+
+    #[test]
+    fn check_f32_to_i32() {
+        let val: f32 = 0.25;
+        assert_eq!(val.to_i32(), (2 << 28, false));
+        let val: f32 = -0.25;
+        assert_eq!(val.to_i32(), (-2 << 28, false));
+        let val: f32 = 1.1;
+        assert_eq!(val.to_i32(), (i32::MAX, true));
+        let val: f32 = -1.1;
+        assert_eq!(val.to_i32(), (i32::MIN, true));
+    }
+
+    #[test]
+    fn check_f64_to_i16() {
+        let val: f64 = 0.25;
+        assert_eq!(val.to_i16(), (2 << 12, false));
+        let val: f64 = -0.25;
+        assert_eq!(val.to_i16(), (-2 << 12, false));
+        let val: f64 = 1.1;
+        assert_eq!(val.to_i16(), (i16::MAX, true));
+        let val: f64 = -1.1;
+        assert_eq!(val.to_i16(), (i16::MIN, true));
+    }
+
+    #[test]
+    fn check_f64_to_i32() {
+        let val: f64 = 0.25;
+        assert_eq!(val.to_i32(), (2 << 28, false));
+        let val: f64 = -0.25;
+        assert_eq!(val.to_i32(), (-2 << 28, false));
+        let val: f64 = 1.1;
+        assert_eq!(val.to_i32(), (i32::MAX, true));
+        let val: f64 = -1.1;
+        assert_eq!(val.to_i32(), (i32::MIN, true));
+    }
+
+    // -------------------
+    //  single values from integers
+    // -------------------
+    #[test]
+    fn check_f32_from_i16() {
+        let val: i16 = 2 << 12;
+        assert_eq!(f32::from_i16(val), 0.25);
+        let val: i16 = -2 << 12;
+        assert_eq!(f32::from_i16(val), -0.25);
+        let val: i16 = i16::MAX;
+        assert_eq!(f32::from_i16(val), 0.9999695);
+        let val: i16 = i16::MIN;
+        assert_eq!(f32::from_i16(val), -1.0);
+    }
+
+    #[test]
+    fn check_f32_from_i32() {
+        let val: i32 = 2 << 28;
+        assert_eq!(f32::from_i32(val), 0.25);
+        let val: i32 = -2 << 28;
+        assert_eq!(f32::from_i32(val), -0.25);
+        let val: i32 = i32::MAX;
+        assert_eq!(f32::from_i32(val), 1.0);
+        let val: i32 = i32::MIN;
+        assert_eq!(f32::from_i32(val), -1.0);
+    }
+
+    #[test]
+    fn check_f64_from_i16() {
+        let val: i16 = 2 << 12;
+        assert_eq!(f64::from_i16(val), 0.25);
+        let val: i16 = -2 << 12;
+        assert_eq!(f64::from_i16(val), -0.25);
+        let val: i16 = i16::MAX;
+        assert_eq!(f64::from_i16(val), 0.999969482421875);
+        let val: i16 = i16::MIN;
+        assert_eq!(f64::from_i16(val), -1.0);
+    }
+
+    #[test]
+    fn check_f64_from_i32() {
+        let val: i32 = 2 << 28;
+        assert_eq!(f64::from_i32(val), 0.25);
+        let val: i32 = -2 << 28;
+        assert_eq!(f64::from_i32(val), -0.25);
+        let val: i32 = i32::MAX;
+        assert_eq!(f64::from_i32(val), 0.9999999995343387);
+        let val: i32 = i32::MIN;
+        assert_eq!(f64::from_i32(val), -1.0);
     }
 }
