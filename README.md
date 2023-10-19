@@ -8,7 +8,7 @@ To do anything with the sample values, these raw bytes must be converted to and 
 This library aims to provide the low level tools for converting most common sample formats from raw bytes to float values. 
 Both `f32` and `f64` are supported, as well as both big-endian and little-endian byte order.
 
-Methods are also provided for converting samples between floats (`f32` and `f64`) and integers (`i16` and `i32`). 
+Methods are also provided for converting samples between floats (`f32` and `f64`) and integers (`i8`, `u8`, `i16` and `i32`). 
 
 When samples are converted, the amplitude is scaled to fit the new type.
 For floats, the values +/- 1.0 are considered full amplitude.

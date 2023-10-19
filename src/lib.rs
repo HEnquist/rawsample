@@ -26,6 +26,7 @@ pub trait Sample<T: Sized> {
     const MAX_I32: T;
     const MAX_I24: T;
     const MAX_I16: T;
+    const MAX_I8: T;
 
     /// Convert a sample value to S32LE (4 bytes)
     fn to_s32_le(&self) -> ([u8; 4], bool);
@@ -51,6 +52,10 @@ pub trait Sample<T: Sized> {
     fn to_f32_le(&self) -> ([u8; 4], bool);
     /// Convert a sample value to F32BE (4 bytes)
     fn to_f32_be(&self) -> ([u8; 4], bool);
+    /// Convert a sample value to S8 (1 byte)
+    fn to_s8_ne(&self) -> ([u8; 1], bool);
+    /// Convert a sample value to U8 (1 byte)
+    fn to_u8_ne(&self) -> ([u8; 1], bool);
 
     /// Convert S32LE (4 bytes) to a sample value
     fn from_s32_le(bytes: [u8; 4]) -> Self;
@@ -76,10 +81,18 @@ pub trait Sample<T: Sized> {
     fn from_f64_le(bytes: [u8; 8]) -> Self;
     /// Convert F64BE (8 bytes) to a sample value
     fn from_f64_be(bytes: [u8; 8]) -> Self;
+    /// Convert S8 (1 byte) to a sample value
+    fn from_s8_ne(bytes: [u8; 1]) -> Self;
+    /// Convert U8 (1 byte) to a sample value
+    fn from_u8_ne(bytes: [u8; 1]) -> Self;
 }
 
 /// The supported sample formats.
 pub enum SampleFormat {
+    /// 8 bit signed integer (single byte without endianness).
+    S8,
+    /// 8 bit unsigned integer (single byte without endianness).
+    U8,
     /// 16 bit signed integer, little endian.
     S16LE,
     /// 16 bit signed integer, big endian.
@@ -110,6 +123,8 @@ impl SampleFormat {
     /// Get the number of bytes that the format uses to store each sample.
     pub fn bytes_per_sample(&self) -> usize {
         match self {
+            SampleFormat::S8 => 1,
+            SampleFormat::U8 => 1,
             SampleFormat::S16LE => 2,
             SampleFormat::S16BE => 2,
             SampleFormat::S24LE3 => 3,
@@ -156,6 +171,12 @@ pub trait SampleWriter<T: Sample<T>> {
         sformat: &SampleFormat,
     ) -> Result<usize, Box<dyn Error>> {
         let nbr_clipped = match sformat {
+            SampleFormat::S8 => {
+                write_samples!(values, target, to_s8_ne)
+            }
+            SampleFormat::U8 => {
+                write_samples!(values, target, to_u8_ne)
+            }
             SampleFormat::S16LE => {
                 write_samples!(values, target, to_s16_le)
             }
@@ -252,6 +273,12 @@ pub trait SampleReader<T: Sample<T>> {
         sampleformat: &SampleFormat,
     ) -> Result<usize, Box<dyn Error>> {
         let nbr_read = match sampleformat {
+            SampleFormat::S8 => {
+                read_samples_to_slice!(rawbytes, samples, from_s8_ne, 1)
+            }
+            SampleFormat::U8 => {
+                read_samples_to_slice!(rawbytes, samples, from_u8_ne, 1)
+            }
             SampleFormat::S16LE => {
                 read_samples_to_slice!(rawbytes, samples, from_s16_le, 2)
             }
@@ -304,6 +331,12 @@ pub trait SampleReader<T: Sample<T>> {
     ) -> Result<usize, Box<dyn Error>> {
         let start_len = samples.len();
         match sampleformat {
+            SampleFormat::S8 => {
+                read_all_samples_to_vec!(rawbytes, samples, from_s8_ne, 1);
+            }
+            SampleFormat::U8 => {
+                read_all_samples_to_vec!(rawbytes, samples, from_u8_ne, 1);
+            }
             SampleFormat::S16LE => {
                 read_all_samples_to_vec!(rawbytes, samples, from_s16_le, 2);
             }
@@ -372,6 +405,19 @@ impl Sample<f64> for f64 {
     const MAX_I32: f64 = 2147483648.0;
     const MAX_I24: f64 = 8388608.0;
     const MAX_I16: f64 = 32768.0;
+    const MAX_I8: f64 = 128.0;
+
+    fn to_s8_ne(&self) -> ([u8; 1], bool) {
+        let val = self * f64::MAX_I8;
+        let (val, clipped) = clamp_int::<f64, i8>(val);
+        ((val as i8).to_le_bytes(), clipped)
+    }
+
+    fn to_u8_ne(&self) -> ([u8; 1], bool) {
+        let val = self * f64::MAX_I8 + f64::MAX_I8;
+        let (val, clipped) = clamp_int::<f64, u8>(val);
+        ((val as u8).to_le_bytes(), clipped)
+    }
 
     fn to_s16_le(&self) -> ([u8; 2], bool) {
         let val = self * f64::MAX_I16;
@@ -447,6 +493,16 @@ impl Sample<f64> for f64 {
         let val = *self as f32;
         let (val, clipped) = clamp_float(val);
         (val.to_be_bytes(), clipped)
+    }
+
+    fn from_s8_ne(bytes: [u8; 1]) -> Self {
+        let intvalue = i8::from_le_bytes(bytes);
+        f64::from(intvalue) / f64::MAX_I8
+    }
+
+    fn from_u8_ne(bytes: [u8; 1]) -> Self {
+        let intvalue = u8::from_le_bytes(bytes);
+        (f64::from(intvalue) - f64::MAX_I8) / f64::MAX_I8
     }
 
     fn from_s32_le(bytes: [u8; 4]) -> Self {
@@ -514,6 +570,19 @@ impl Sample<f32> for f32 {
     const MAX_I32: f32 = 2147483648.0;
     const MAX_I24: f32 = 8388608.0;
     const MAX_I16: f32 = 32768.0;
+    const MAX_I8: f32 = 128.0;
+
+    fn to_s8_ne(&self) -> ([u8; 1], bool) {
+        let val = self * f32::MAX_I8;
+        let (val, clipped) = clamp_int::<f32, i8>(val);
+        ((val as i8).to_le_bytes(), clipped)
+    }
+
+    fn to_u8_ne(&self) -> ([u8; 1], bool) {
+        let val = self * f32::MAX_I8 + f32::MAX_I8;
+        let (val, clipped) = clamp_int::<f32, u8>(val);
+        ((val as u8).to_le_bytes(), clipped)
+    }
 
     fn to_s16_le(&self) -> ([u8; 2], bool) {
         let val = self * f32::MAX_I16;
@@ -587,6 +656,16 @@ impl Sample<f32> for f32 {
     fn to_f32_be(&self) -> ([u8; 4], bool) {
         let (val, clipped) = clamp_float(*self);
         (val.to_be_bytes(), clipped)
+    }
+
+    fn from_s8_ne(bytes: [u8; 1]) -> Self {
+        let intvalue = i8::from_le_bytes(bytes);
+        f32::from(intvalue) / f32::MAX_I8
+    }
+
+    fn from_u8_ne(bytes: [u8; 1]) -> Self {
+        let intvalue = u8::from_le_bytes(bytes);
+        (f32::from(intvalue) - f32::MAX_I8) / f32::MAX_I8
     }
 
     fn from_s32_le(bytes: [u8; 4]) -> Self {
@@ -656,11 +735,19 @@ impl Sample<f32> for f32 {
 /// The trait methods are similar to the [Sample] methods,
 /// but convert to and from integers values instead of raw bytes.
 pub trait IntegerSample<T: Sized> {
+    /// Convert a sample value to `i8`
+    fn to_i8(&self) -> (i8, bool);
+    /// Convert a sample value to `u8`
+    fn to_u8(&self) -> (u8, bool);
     /// Convert a sample value to `i16`
     fn to_i16(&self) -> (i16, bool);
     /// Convert a sample value to `i32`
     fn to_i32(&self) -> (i32, bool);
 
+    /// Convert `i8` to a sample value
+    fn from_i8(value: i8) -> Self;
+    /// Convert `u8` to a sample value
+    fn from_u8(value: u8) -> Self;
     /// Convert `i16` to a sample value
     fn from_i16(value: i16) -> Self;
     /// Convert `i32` to a sample value
@@ -668,6 +755,18 @@ pub trait IntegerSample<T: Sized> {
 }
 
 impl IntegerSample<f32> for f32 {
+    fn to_i8(&self) -> (i8, bool) {
+        let val = self * f32::MAX_I8;
+        let (val, clipped) = clamp_int::<f32, i8>(val);
+        (val as i8, clipped)
+    }
+
+    fn to_u8(&self) -> (u8, bool) {
+        let val = self * f32::MAX_I8 + f32::MAX_I8;
+        let (val, clipped) = clamp_int::<f32, u8>(val);
+        (val as u8, clipped)
+    }
+
     fn to_i16(&self) -> (i16, bool) {
         let val = self * f32::MAX_I16;
         let (val, clipped) = clamp_int::<f32, i16>(val);
@@ -680,6 +779,14 @@ impl IntegerSample<f32> for f32 {
         (val as i32, clipped)
     }
 
+    fn from_i8(value: i8) -> Self {
+        f32::from(value) / f32::MAX_I8
+    }
+
+    fn from_u8(value: u8) -> Self {
+        (f32::from(value) - f32::MAX_I8) / f32::MAX_I8
+    }
+
     fn from_i16(value: i16) -> Self {
         f32::from(value) / f32::MAX_I16
     }
@@ -690,6 +797,18 @@ impl IntegerSample<f32> for f32 {
 }
 
 impl IntegerSample<f64> for f64 {
+    fn to_i8(&self) -> (i8, bool) {
+        let val = self * f64::MAX_I8;
+        let (val, clipped) = clamp_int::<f64, i8>(val);
+        (val as i8, clipped)
+    }
+
+    fn to_u8(&self) -> (u8, bool) {
+        let val = self * f64::MAX_I8 + f64::MAX_I8;
+        let (val, clipped) = clamp_int::<f64, u8>(val);
+        (val as u8, clipped)
+    }
+
     fn to_i16(&self) -> (i16, bool) {
         let val = self * f64::MAX_I16;
         let (val, clipped) = clamp_int::<f64, i16>(val);
@@ -700,6 +819,14 @@ impl IntegerSample<f64> for f64 {
         let val = self * f64::MAX_I32;
         let (val, clipped) = clamp_int::<f64, i32>(val);
         (val as i32, clipped)
+    }
+
+    fn from_i8(value: i8) -> Self {
+        f64::from(value) / f64::MAX_I8
+    }
+
+    fn from_u8(value: u8) -> Self {
+        (f64::from(value) - f64::MAX_I8) / f64::MAX_I8
     }
 
     fn from_i16(value: i16) -> Self {
@@ -1087,6 +1214,38 @@ mod tests {
     }
 
     #[test]
+    fn check_f32_to_s8() {
+        let val: f32 = 0.25;
+        assert_eq!(val.to_s8_ne(), ([32], false));
+        let val: f32 = -0.25;
+        assert_eq!(val.to_s8_ne(), ([224], false));
+    }
+
+    #[test]
+    fn check_f32_to_u8() {
+        let val: f32 = 0.25;
+        assert_eq!(val.to_u8_ne(), ([160], false));
+        let val: f32 = -0.25;
+        assert_eq!(val.to_u8_ne(), ([96], false));
+    }
+
+    #[test]
+    fn check_f32_from_s8() {
+        let data = [32];
+        assert_eq!(f32::from_s8_ne(data), 0.25);
+        let data = [224];
+        assert_eq!(f32::from_s8_ne(data), -0.25);
+    }
+
+    #[test]
+    fn check_f32_from_u8() {
+        let data = [160];
+        assert_eq!(f32::from_u8_ne(data), 0.25);
+        let data = [96];
+        assert_eq!(f32::from_u8_ne(data), -0.25);
+    }
+
+    #[test]
     fn check_f32_to_f32le() {
         let val: f32 = 0.256789;
         let exp = (0.256789 as f32).to_le_bytes();
@@ -1278,6 +1437,30 @@ mod tests {
         assert_eq!(val.to_i32(), (i32::MIN, true));
     }
 
+    #[test]
+    fn check_f64_to_i8() {
+        let val: f64 = 0.25;
+        assert_eq!(val.to_i8(), (2 << 4, false));
+        let val: f64 = -0.25;
+        assert_eq!(val.to_i8(), (-2 << 4, false));
+        let val: f64 = 1.1;
+        assert_eq!(val.to_i8(), (i8::MAX, true));
+        let val: f64 = -1.1;
+        assert_eq!(val.to_i8(), (i8::MIN, true));
+    }
+
+    #[test]
+    fn check_f64_to_u8() {
+        let val: f64 = 0.25;
+        assert_eq!(val.to_u8(), (128 + (2 << 4), false));
+        let val: f64 = -0.25;
+        assert_eq!(val.to_u8(), (128 - (2 << 4), false));
+        let val: f64 = 1.1;
+        assert_eq!(val.to_u8(), (u8::MAX, true));
+        let val: f64 = -1.1;
+        assert_eq!(val.to_u8(), (u8::MIN, true));
+    }
+
     // -------------------
     //  single values from integers
     // -------------------
@@ -1327,5 +1510,29 @@ mod tests {
         assert_eq!(f64::from_i32(val), 0.9999999995343387);
         let val: i32 = i32::MIN;
         assert_eq!(f64::from_i32(val), -1.0);
+    }
+
+    #[test]
+    fn check_f64_from_i8() {
+        let val: i8 = 2 << 4;
+        assert_eq!(f64::from_i8(val), 0.25);
+        let val: i8 = -2 << 4;
+        assert_eq!(f64::from_i8(val), -0.25);
+        let val: i8 = i8::MAX;
+        assert_eq!(f64::from_i8(val), 0.9921875);
+        let val: i8 = i8::MIN;
+        assert_eq!(f64::from_i8(val), -1.0);
+    }
+
+    #[test]
+    fn check_f64_from_u8() {
+        let val: u8 = 128 + (2 << 4);
+        assert_eq!(f64::from_u8(val), 0.25);
+        let val: u8 = 128 - (2 << 4);
+        assert_eq!(f64::from_u8(val), -0.25);
+        let val: u8 = u8::MAX;
+        assert_eq!(f64::from_u8(val), 0.9921875);
+        let val: u8 = u8::MIN;
+        assert_eq!(f64::from_u8(val), -1.0);
     }
 }
