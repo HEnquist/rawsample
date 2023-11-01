@@ -6,7 +6,7 @@ use std::error::Error;
 use std::io::ErrorKind;
 use std::io::{Read, Write};
 
-/// The `Sample` trait is used for low-level conversions of samples stored as raw bytes, to `f32` or `f64` sample values.
+/// The `BytesSample` trait is used for low-level conversions of samples stored as raw bytes, to `f32` or `f64` sample values.
 ///
 /// The float values are expected to use the range -1.0 <= value < +1.0.
 /// The integer types are mapped to this range.
@@ -22,7 +22,7 @@ use std::io::{Read, Write};
 /// When writing samples, the float sample values are clamped to the range supported by the chosen format.
 /// Float output values are also clamped to the -1.0 to +1.0 range, since this is what most audio APIs expect.
 
-pub trait Sample<T: Sized> {
+pub trait BytesSample<T: Sized> {
     const MAX_I32: T;
     const MAX_I24: T;
     const MAX_I16: T;
@@ -156,7 +156,7 @@ macro_rules! write_samples {
 }
 
 /// The SampleWriter trait enables converting and writing many sample values from a slice.
-pub trait SampleWriter<T: Sample<T>> {
+pub trait SampleWriter<T: BytesSample<T>> {
     /// Write sample values from a slice to anything that implements the "Write" trait.
     /// This can be for example a file, or a `Vec` of `u8`.
     /// Input samples are `f32` or `f64`, and are converted to the given sample format.
@@ -260,7 +260,7 @@ macro_rules! read_all_samples_to_vec {
 
 /// The SampleReader trait enables reading and converting raw bytes and to multiple samples.
 
-pub trait SampleReader<T: Sample<T>> {
+pub trait SampleReader<T: BytesSample<T>> {
     /// Read bytes from anything that implements the [std::io::Read] trait.
     /// This can be for example a file, or a slice of `u8`.
     /// The bytes are then converted to `f32` or `f64` values, and stored in a slice.
@@ -401,7 +401,7 @@ fn clamp_float<T: Float>(value: T) -> (T, bool) {
     (value, false)
 }
 
-impl Sample<f64> for f64 {
+impl BytesSample<f64> for f64 {
     const MAX_I32: f64 = 2147483648.0;
     const MAX_I24: f64 = 8388608.0;
     const MAX_I16: f64 = 32768.0;
@@ -566,7 +566,7 @@ impl Sample<f64> for f64 {
     }
 }
 
-impl Sample<f32> for f32 {
+impl BytesSample<f32> for f32 {
     const MAX_I32: f32 = 2147483648.0;
     const MAX_I24: f32 = 8388608.0;
     const MAX_I16: f32 = 32768.0;
@@ -729,12 +729,13 @@ impl Sample<f32> for f32 {
     }
 }
 
-/// The IntegerSample trait is used for conversions of samples
-/// stored as integer values (`i32` or `i16`), to `f32` or `f64` sample values.
+/// The NumericSample trait is used for conversions of samples
+/// between numeric types such as `i16`, `i32` or `f32`,
+/// and float values (`f32` or `f64`).
 ///
 /// The trait methods are similar to the [Sample] methods,
-/// but convert to and from integers values instead of raw bytes.
-pub trait IntegerSample<T: Sized> {
+/// but convert to and from numeric types instead of raw bytes.
+pub trait NumericSample<T: Sized> {
     /// Convert a sample value to `i8`
     fn to_i8(&self) -> (i8, bool);
     /// Convert a sample value to `u8`
@@ -743,6 +744,10 @@ pub trait IntegerSample<T: Sized> {
     fn to_i16(&self) -> (i16, bool);
     /// Convert a sample value to `i32`
     fn to_i32(&self) -> (i32, bool);
+    /// Convert a sample value to `f32`
+    fn to_f32(&self) -> (f32, bool);
+    /// Convert a sample value to `f64`
+    fn to_f64(&self) -> (f64, bool);
 
     /// Convert `i8` to a sample value
     fn from_i8(value: i8) -> Self;
@@ -752,9 +757,13 @@ pub trait IntegerSample<T: Sized> {
     fn from_i16(value: i16) -> Self;
     /// Convert `i32` to a sample value
     fn from_i32(value: i32) -> Self;
+    /// Convert `f32` to a sample value
+    fn from_f32(value: f32) -> Self;
+    /// Convert `f64` to a sample value
+    fn from_f64(value: f64) -> Self;
 }
 
-impl IntegerSample<f32> for f32 {
+impl NumericSample<f32> for f32 {
     fn to_i8(&self) -> (i8, bool) {
         let val = self * f32::MAX_I8;
         let (val, clipped) = clamp_int::<f32, i8>(val);
@@ -779,6 +788,14 @@ impl IntegerSample<f32> for f32 {
         (val as i32, clipped)
     }
 
+    fn to_f32(&self) -> (f32, bool) {
+        (*self, false)
+    }
+
+    fn to_f64(&self) -> (f64, bool) {
+        (*self as f64, false)
+    }
+
     fn from_i8(value: i8) -> Self {
         f32::from(value) / f32::MAX_I8
     }
@@ -794,9 +811,17 @@ impl IntegerSample<f32> for f32 {
     fn from_i32(value: i32) -> Self {
         value as f32 / f32::MAX_I32
     }
+
+    fn from_f32(value: f32) -> Self {
+        value
+    }
+
+    fn from_f64(value: f64) -> Self {
+        value as f32
+    }
 }
 
-impl IntegerSample<f64> for f64 {
+impl NumericSample<f64> for f64 {
     fn to_i8(&self) -> (i8, bool) {
         let val = self * f64::MAX_I8;
         let (val, clipped) = clamp_int::<f64, i8>(val);
@@ -821,6 +846,14 @@ impl IntegerSample<f64> for f64 {
         (val as i32, clipped)
     }
 
+    fn to_f32(&self) -> (f32, bool) {
+        (*self as f32, false)
+    }
+
+    fn to_f64(&self) -> (f64, bool) {
+        (*self, false)
+    }
+
     fn from_i8(value: i8) -> Self {
         f64::from(value) / f64::MAX_I8
     }
@@ -836,12 +869,20 @@ impl IntegerSample<f64> for f64 {
     fn from_i32(value: i32) -> Self {
         value as f64 / f64::MAX_I32
     }
+
+    fn from_f32(value: f32) -> Self {
+        value as f64
+    }
+
+    fn from_f64(value: f64) -> Self {
+        value
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::IntegerSample;
-    use crate::Sample;
+    use crate::NumericSample;
+    use crate::BytesSample;
     use crate::SampleFormat;
     use crate::SampleReader;
     use crate::SampleWriter;
